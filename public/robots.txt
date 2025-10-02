@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://bharatvanshavali.com/sitemap.xml
+
+# Disallow admin and API routes
+Disallow: /admin/
+Disallow: /api/
+
+# Disallow user-specific pages
+Disallow: /citizen/
+Disallow: /login
+Disallow: /register
+
+# Allow public pages
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /help
+
+# Crawl delay
+Crawl-delay: 1

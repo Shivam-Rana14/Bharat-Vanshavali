@@ -1,0 +1,64 @@
+{
+  "name": "Bharat Vanshavali - India's Genealogy Platform",
+  "short_name": "Bharat Vanshavali",
+  "description": "India's first open genealogy platform for preserving heritage and building community",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "orientation": "portrait-primary",
+  "categories": ["genealogy", "family", "heritage", "utilities"],
+  "lang": "en-IN",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/placeholder-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/placeholder-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "platform": "narrow"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Family Tree",
+      "short_name": "Tree",
+      "description": "View your family tree",
+      "url": "/citizen/family-tree",
+      "icons": [{ "src": "/placeholder-logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Add Member",
+      "short_name": "Add",
+      "description": "Add new family member",
+      "url": "/citizen/add-member",
+      "icons": [{ "src": "/placeholder-logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Search",
+      "short_name": "Search",
+      "description": "Search family members",
+      "url": "/citizen/search",
+      "icons": [{ "src": "/placeholder-logo.png", "sizes": "192x192" }]
+    }
+  ]
+}
