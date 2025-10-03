@@ -164,5 +164,24 @@ export const COLORS = {
     GRAY: "#6b7280",
     BLACK: "#111827",
     WHITE: "#ffffff"
+  },
+  // Family Tree specific colors
+  FAMILY_TREE: {
+    ROOT_MEMBER: "#e3f2fd", // Light blue for root members
+    REGULAR_MEMBER: "#fff3e0", // Light orange for regular members
+    NODE_DEFAULT: "#ffffff", // Default node color
+    CONNECTION_DEFAULT: "#666666", // Default connection color
+    HORIZONTAL_CONNECTION: "#8b5cf6", // Purple for horizontal connections
+    VERTICAL_CONNECTION: "#3b82f6", // Blue for vertical connections
+    CONNECTION_PREVIEW: "#ef4444", // Red for connection preview
+    BACKGROUND_DEFAULT: "#f8f9fa" // Default tree background
   }
+} as const
+
+// Default values for configuration
+export const DEFAULTS = {
+  TEMP_EMAIL_DOMAIN: "temp.email",
+  TEMP_PASSWORD: "TempPassword123!",
+  FAMILY_CODE_PREFIX: "BV",
+  LOGIN_ID_PREFIX: "BV"
 } as const 

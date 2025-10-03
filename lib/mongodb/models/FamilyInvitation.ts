@@ -25,7 +25,7 @@ const FamilyInvitationSchema = new Schema<IFamilyInvitation>({
     enum: ['pending', 'accepted', 'rejected', 'expired'], 
     default: 'pending' 
   },
-  token: { type: String, required: true, unique: true },
+  token: { type: String, required: true },
   expiresAt: { type: Date, required: true },
   respondedAt: { type: Date }
 }, {
@@ -35,7 +35,7 @@ const FamilyInvitationSchema = new Schema<IFamilyInvitation>({
 // Index for better performance
 FamilyInvitationSchema.index({ familyTreeId: 1 })
 FamilyInvitationSchema.index({ invitedEmail: 1 })
-FamilyInvitationSchema.index({ token: 1 })
+FamilyInvitationSchema.index({ token: 1 }, { unique: true })
 FamilyInvitationSchema.index({ status: 1 })
 FamilyInvitationSchema.index({ expiresAt: 1 })
 

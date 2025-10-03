@@ -21,18 +21,30 @@ export default function CitizenDashboard() {
   const [familyMembers, setFamilyMembers] = useState<any[]>([])
   const [loadingMembers, setLoadingMembers] = useState(true)
   
-  // Fetch family members from API
+  // Fetch family members from API (using new node-based system)
   useEffect(() => {
     const fetchFamilyMembers = async () => {
       if (!user?.familyCode) return
       
       try {
         setLoadingMembers(true)
-        const response = await fetch(`/api/family-members?familyCode=${user.familyCode}`)
+        const response = await fetch(`/api/family-tree/nodes?familyCode=${user.familyCode}`)
+        
         if (response.ok) {
           const data = await response.json()
+          
           if (data.success) {
-            setFamilyMembers(data.members || [])
+            // Transform nodes to match the expected format
+            const members = data.nodes.map((node: any) => ({
+              id: node.id,
+              name: node.data.user?.fullName || 'Unknown',
+              relation: node.data.user?.loginId === user.loginId ? 'Self' : 'Family Member',
+              loginId: node.data.user?.loginId || 'N/A',
+              status: node.data.user?.verificationStatus || 'pending', // Use actual verification status
+              dateOfBirth: node.data.user?.dateOfBirth,
+              isRoot: node.data.user?._id === data.familyTree.rootUserId
+            }))
+            setFamilyMembers(members)
           }
         }
       } catch (error) {
@@ -43,6 +55,44 @@ export default function CitizenDashboard() {
     }
 
     fetchFamilyMembers()
+  }, [user])
+
+  // Auto-refresh dashboard every 60 seconds to show newly joined members
+  useEffect(() => {
+    if (!user?.familyCode) return
+
+    const interval = setInterval(() => {
+      const fetchFamilyMembers = async () => {
+        if (!user?.familyCode) return
+        
+        try {
+          const response = await fetch(`/api/family-tree/nodes?familyCode=${user.familyCode}`)
+          
+          if (response.ok) {
+            const data = await response.json()
+            
+            if (data.success) {
+              const members = data.nodes.map((node: any) => ({
+                id: node.id,
+                name: node.data.user?.fullName || 'Unknown',
+                relation: node.data.user?.loginId === user.loginId ? 'Self' : 'Family Member',
+                loginId: node.data.user?.loginId || 'N/A',
+                status: node.data.user?.verificationStatus || 'pending',
+                dateOfBirth: node.data.user?.dateOfBirth,
+                isRoot: node.data.user?._id === data.familyTree.rootUserId
+              }))
+              setFamilyMembers(members)
+            }
+          }
+        } catch (error) {
+          console.error('Auto-refresh failed:', error)
+        }
+      }
+      
+      fetchFamilyMembers()
+    }, 60000) // Refresh every 60 seconds
+
+    return () => clearInterval(interval)
   }, [user])
 
   useEffect(() => {
@@ -115,13 +165,22 @@ export default function CitizenDashboard() {
             variant: "default"
           })
           setJoinCode("")
-          // Refresh family members
+          // Refresh family members using new node-based API
           if (user?.familyCode) {
-            const response = await fetch(`/api/family-members?familyCode=${user.familyCode}`)
+            const response = await fetch(`/api/family-tree/nodes?familyCode=${user.familyCode}`)
             if (response.ok) {
               const data = await response.json()
               if (data.success) {
-                setFamilyMembers(data.members || [])
+                const members = data.nodes.map((node: any) => ({
+                  id: node.id,
+                  name: node.data.user?.fullName || 'Unknown',
+                  relation: node.data.user?.loginId === user.loginId ? 'Self' : 'Family Member',
+                  loginId: node.data.user?.loginId || 'N/A',
+                  status: node.data.user?.verificationStatus || 'pending', // Use actual verification status
+                  dateOfBirth: node.data.user?.dateOfBirth,
+                  isRoot: node.data.user?._id === data.familyTree.rootUserId
+                }))
+                setFamilyMembers(members)
               }
             }
           }

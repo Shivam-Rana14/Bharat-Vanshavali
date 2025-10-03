@@ -60,7 +60,7 @@ export function FamilySearch({ onMemberSelect, showFilters = true }: FamilySearc
         if (searchFilters.gender) params.append('gender', searchFilters.gender)
         if (searchFilters.location) params.append('location', searchFilters.location)
 
-        const response = await fetch(`/api/family-members/search?${params}`)
+        const response = await fetch(`/api/family-tree/nodes/search?${params}`)
         const result = await response.json()
 
         if (result.success) {

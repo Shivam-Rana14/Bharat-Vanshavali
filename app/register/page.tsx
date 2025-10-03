@@ -29,10 +29,7 @@ interface FormData {
   password: string
   confirmPassword: string
   
-  // Ancestral Details
-  fatherName: string
-  motherName: string
-  grandfatherName: string
+  // Additional Details
   nativePlace: string
   caste: string
   reference1Name: string
@@ -87,10 +84,7 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     
-    // Ancestral Details
-    fatherName: "",
-    motherName: "",
-    grandfatherName: "",
+    // Additional Details
     nativePlace: "",
     caste: "",
     reference1Name: "",
@@ -131,8 +125,6 @@ export default function RegisterPage() {
         fullName: formData.fullName,
         phone: formData.mobile,
         dateOfBirth: formData.dateOfBirth,
-        fatherName: formData.fatherName,
-        motherName: formData.motherName,
         reference1Name: formData.reference1Name,
         reference1Phone: formData.reference1Mobile,
         reference2Name: formData.reference2Name,
@@ -687,77 +679,22 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* Step 2: Ancestral Details */}
+            {/* Step 2: Family & Additional Details */}
             {currentStep === 2 && (
               <div className="space-y-6">
                 <div className="bg-green-50 p-4 rounded-lg">
                   <div className="flex items-start space-x-3">
                     <TreePine className="w-5 h-5 text-green-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-green-800">Ancestral Information</p>
+                      <p className="text-sm font-medium text-green-800">Family & Additional Information</p>
                       <p className="text-xs text-green-700 mt-1">
-                        Help us connect you with your family lineage
+                        Join an existing family or create a new one
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="fatherName">Father's Name</Label>
-                    <Input
-                      id="fatherName"
-                      type="text"
-                      value={formData.fatherName}
-                      onChange={(e) => setFormData({...formData, fatherName: e.target.value})}
-                      placeholder="Enter father's name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="motherName">Mother's Name</Label>
-                    <Input
-                      id="motherName"
-                      type="text"
-                      value={formData.motherName}
-                      onChange={(e) => setFormData({...formData, motherName: e.target.value})}
-                      placeholder="Enter mother's name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="grandfatherName">Grandfather's Name</Label>
-                    <Input
-                      id="grandfatherName"
-                      type="text"
-                      value={formData.grandfatherName}
-                      onChange={(e) => setFormData({...formData, grandfatherName: e.target.value})}
-                      placeholder="Enter grandfather's name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="nativePlace">Native Place</Label>
-                    <Input
-                      id="nativePlace"
-                      type="text"
-                      value={formData.nativePlace}
-                      onChange={(e) => setFormData({...formData, nativePlace: e.target.value})}
-                      placeholder="Village/City, State"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="caste">Caste/Community</Label>
-                    <Input
-                      id="caste"
-                      type="text"
-                      value={formData.caste}
-                      onChange={(e) => setFormData({...formData, caste: e.target.value})}
-                      placeholder="Enter caste or community"
-                    />
-                  </div>
-
                   <div>
                     <Label htmlFor="familyCode">Family Code (Optional)</Label>
                     <div className="flex space-x-2">
@@ -796,17 +733,41 @@ export default function RegisterPage() {
 
                     {showRelationship && (
                       <div className="mt-4">
-                        <Label htmlFor="relationship">Relationship to Root *</Label>
+                        <Label htmlFor="relationship">Your Role in Family</Label>
                         <Input
                           id="relationship"
                           type="text"
                           value={formData.relationship || ''}
                           onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
-                          placeholder="e.g., Son, Daughter, Grandson"
-                          required
+                          placeholder="e.g., Son, Daughter, Brother, Sister"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          This will help the root member connect you properly in the family tree
+                        </p>
                       </div>
                     )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="nativePlace">Native Place</Label>
+                    <Input
+                      id="nativePlace"
+                      type="text"
+                      value={formData.nativePlace}
+                      onChange={(e) => setFormData({...formData, nativePlace: e.target.value})}
+                      placeholder="Village/City, State"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="caste">Caste/Community</Label>
+                    <Input
+                      id="caste"
+                      type="text"
+                      value={formData.caste}
+                      onChange={(e) => setFormData({...formData, caste: e.target.value})}
+                      placeholder="Enter caste or community"
+                    />
                   </div>
 
                   <div className="md:col-span-2">

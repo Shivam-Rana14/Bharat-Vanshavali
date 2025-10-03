@@ -3,7 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose'
 export interface IFamilyMember extends Document {
   _id: string
   userId?: string
-  familyTreeId: string
+  familyTreeId: any
   fullName: string
   relationship: string // Original relationship (e.g., "father", "mother")
   relationshipToTarget?: string // Smart relationship (e.g., "Father of John")
@@ -23,7 +23,7 @@ export interface IFamilyMember extends Document {
   verificationStatus: 'pending' | 'verified' | 'rejected'
   isRootMember: boolean // True if this member is the root of the family tree
   joinedAt: Date // When this member joined the family (for root member determination)
-  createdBy: string
+  createdBy: any
   createdAt: Date
   updatedAt: Date
   verifiedAt?: Date

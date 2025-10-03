@@ -15,9 +15,6 @@ export interface IUser extends Document {
   dateOfBirth?: Date
   placeOfBirth?: string
   gender?: 'male' | 'female' | 'other'
-  fatherName?: string
-  motherName?: string
-  grandfatherName?: string
   nativePlace?: string
   caste?: string
   signupLatitude?: number
@@ -70,9 +67,6 @@ const UserSchema = new Schema<IUser>({
   dateOfBirth: { type: Date },
   placeOfBirth: { type: String },
   gender: { type: String, enum: ['male', 'female', 'other'] },
-  fatherName: { type: String },
-  motherName: { type: String },
-  grandfatherName: { type: String },
   nativePlace: { type: String },
   caste: { type: String },
   signupLatitude: { type: Number },

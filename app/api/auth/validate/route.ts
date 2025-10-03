@@ -34,10 +34,9 @@ export async function POST(request: NextRequest) {
           }
 
           let rootName = undefined
-          if (tree.rootMemberId) {
-            const members = await databaseService.getFamilyMembers(tree._id.toString())
-            const root = members.find((m: any) => m._id.toString() === tree.rootMemberId.toString())
-            rootName = root?.fullName
+          if (tree.rootUserId) {
+            const rootUser = await databaseService.getUserById(tree.rootUserId.toString())
+            rootName = rootUser?.fullName
           }
 
           return NextResponse.json({
