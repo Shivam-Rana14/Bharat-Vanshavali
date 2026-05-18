@@ -1,9 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IFamilyInvitation extends Document {
-  _id: string
-  familyTreeId: string
-  invitedBy: string
+  familyTreeId: mongoose.Types.ObjectId
+  invitedBy: mongoose.Types.ObjectId
   invitedEmail: string
   invitedPhone?: string
   relationship: string

@@ -64,7 +64,8 @@ export function Navbar() {
   const { toast } = useToast()
 
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  // unreadCount = total notifications count (since all notifications in DB are unread by design)
+  const unreadCount = notifications.length
 
   useEffect(() => {
     const handleResize = () => {
@@ -77,38 +78,24 @@ export function Navbar() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Fetch real notifications when user is authenticated
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      if (!user) return
-      
-      try {
-        const response = await fetch('/api/notifications')
-        if (response.ok) {
-          const contentType = response.headers.get('content-type')
-          if (contentType && contentType.includes('application/json')) {
-            const data = await response.json()
-            if (data.success) {
-              setNotifications(data.notifications || [])
-            }
-          } else {
-            // Response is not JSON, probably HTML (redirect or error page)
-            console.log('Notifications API returned non-JSON response, using mock data')
-            setNotifications(mockNotifications)
-          }
-        } else {
-          // API endpoint doesn't exist or returned error, use mock data
-          console.log('Notifications API not available, using mock data')
-          setNotifications(mockNotifications)
+  // Fetch real notifications count for badge
+  const fetchNotificationsBadge = async () => {
+    if (!user) return
+    try {
+      const response = await fetch('/api/notifications', { cache: 'no-store' })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setNotifications(data.notifications || [])
         }
-      } catch (error) {
-        console.error('Failed to fetch notifications:', error)
-        // Fallback to mock data on error
-        setNotifications(mockNotifications)
       }
+    } catch (error) {
+      // Silently fail — badge just won't show
     }
+  }
 
-    fetchNotifications()
+  useEffect(() => {
+    fetchNotificationsBadge()
   }, [user])
 
   const handleLogout = () => {
@@ -119,34 +106,22 @@ export function Navbar() {
     setNotificationsModal(true)
   }
 
+  // When modal closes, re-fetch count so badge stays accurate
+  const handleNotificationsModalClose = () => {
+    setNotificationsModal(false)
+    fetchNotificationsBadge()
+  }
+
   const handleMarkAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    )
-    toast({
-      title: "Notification marked as read",
-      variant: "success"
-    })
+    setNotifications(prev => prev.filter(n => n._id !== id))
   }
 
   const handleDeleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id))
-    toast({
-      title: "Notification deleted",
-      variant: "success"
-    })
+    setNotifications(prev => prev.filter(n => n._id !== id))
   }
 
   const handleMarkAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    )
-    toast({
-      title: "All notifications marked as read",
-      variant: "success"
-    })
+    setNotifications([])
   }
 
   const getNavigationItems = (): NavigationItem[] => {
@@ -389,8 +364,12 @@ export function Navbar() {
       {user && (
         <NotificationsModal
           isOpen={notificationsModal}
-          onClose={() => setNotificationsModal(false)}
+          onClose={handleNotificationsModalClose}
           userId={user.id}
+          onUnreadCountChange={(count) => {
+            // Sync local badge count when modal updates it
+            if (count === 0) setNotifications([])
+          }}
         />
       )}
     </>

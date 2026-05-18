@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     requireAdmin(request)
 
-    const families = await databaseService.listFamilies()
+    const families = await databaseService.getAllFamiliesWithMembers()
     return NextResponse.json({ success: true, data: families })
   } catch (e) {
     console.error('Admin families error:', e)

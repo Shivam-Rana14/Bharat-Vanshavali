@@ -1,0 +1,131 @@
+
+🎯 Target Family Code: TEST5590 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+✅ Join Successful.
+✅ Relationship "brother" correctly saved in DB.
+
+🎯 Target Family Code: TEST1371 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+Test Error: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+🎯 Target Family Code: TEST986 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+Test Error: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+🎯 Target Family Code: TEST5573 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+❌ Join Failed: {"success":false,"error":"Failed to join family"}
+
+🎯 Target Family Code: TEST9688 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+❌ Join Failed: {"success":false,"error":"Failed to join family","details":"FamilyMember validation failed: gender: Path `gender` is required."}
+
+🎯 Target Family Code: TEST3966 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+✅ Join Successful.
+✅ Relationship "brother" correctly saved in DB.
+
+🧪 Step 3: Verifying Visual Elements (Nodes & Connections)...
+✅ Visual Node created for joining user.
+❌ Connection MISSING between Root and User.
+
+🎯 Target Family Code: TEST8825 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+✅ Join Successful.
+✅ Relationship "brother" correctly saved in DB.
+
+🧪 Step 3: Verifying Visual Elements (Nodes & Connections)...
+✅ Visual Node created for joining user.
+❌ Connection MISSING between Root and User.
+
+🎯 Target Family Code: TEST1151 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+❌ Join Failed: {"success":false,"error":"Failed to join family"}
+
+🎯 Target Family Code: TEST4796 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+✅ Join Successful.
+✅ Relationship "brother" correctly saved in DB.
+
+🧪 Step 3: Verifying Visual Elements (Nodes & Connections)...
+✅ Visual Node created for joining user.
+❌ Connection MISSING between Root and User.
+✅ Member Count updated correctly: 1 -> 2
+
+🎯 Target Family Code: TEST5469 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+Test Error: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+🎯 Target Family Code: TEST1491 (Root: Target Root)
+
+🧪 Step 1: Validating Family Code...
+✅ Validation Successful.
+   - Family Name: Target Root's Tree
+   - Root Member: Target Root
+✅ Root member name matches.
+
+🧪 Step 2: Joining with Relationship "brother"...
+✅ Join Successful.
+❌ Relationship NOT saved correctly. Got: undefined
+
+🧪 Step 3: Verifying Visual Elements (Nodes & Connections)...
+✅ Visual Node created for joining user.
+❌ Connection MISSING between Root and User.

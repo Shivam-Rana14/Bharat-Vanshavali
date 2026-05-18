@@ -4,16 +4,19 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Table, Tbody, Td, Th, Thead, Tr } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 
 interface Member {
   _id: string
-  fullName: string
   relationship: string
-  verificationStatus: 'pending' | 'verified' | 'rejected'
-  userId?: { email: string; loginId: string }
+  userId: {
+    email: string
+    loginId: string
+    fullName: string
+    verificationStatus: 'pending' | 'verified' | 'rejected'
+  }
 }
 
 export default function FamilyMembersPage({ params }: { params: { familyCode: string } }) {
@@ -71,30 +74,30 @@ export default function FamilyMembersPage({ params }: { params: { familyCode: st
               <TabsTrigger value="rejected">Rejected</TabsTrigger>
             </TabsList>
 
-            {(['pending','verified','rejected'] as const).map((s) => (
+            {(['pending', 'verified', 'rejected'] as const).map((s) => (
               <TabsContent key={s} value={s} className="pt-4">
                 {loading ? 'Loading...' : (
                   <Table>
-                    <Thead>
-                      <Tr><Th>Name</Th><Th>Relationship</Th><Th>Email</Th><Th></Th></Tr>
-                    </Thead>
-                    <Tbody>
+                    <TableHeader>
+                      <TableRow><TableHead>Name</TableHead><TableHead>Relationship</TableHead><TableHead>Email</TableHead><TableHead></TableHead></TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {members.map(m => (
-                        <Tr key={m._id}>
-                          <Td>{m.fullName}</Td>
-                          <Td>{m.relationship}</Td>
-                          <Td>{m.userId?.email}</Td>
-                          <Td>
+                        <TableRow key={m._id}>
+                          <TableCell>{m.userId?.fullName || 'Unknown'}</TableCell>
+                          <TableCell>{m.relationship}</TableCell>
+                          <TableCell>{m.userId?.email}</TableCell>
+                          <TableCell>
                             {s === 'pending' && (
                               <>
-                                <Button size="sm" onClick={() => updateStatus(m._id,'verified')}>Verify</Button>
-                                <Button variant="outline" size="sm" className="ml-2" onClick={() => updateStatus(m._id,'rejected')}>Reject</Button>
+                                <Button size="sm" onClick={() => updateStatus(m._id, 'verified')}>Verify</Button>
+                                <Button variant="outline" size="sm" className="ml-2" onClick={() => updateStatus(m._id, 'rejected')}>Reject</Button>
                               </>
                             )}
-                          </Td>
-                        </Tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </Tbody>
+                    </TableBody>
                   </Table>
                 )}
               </TabsContent>

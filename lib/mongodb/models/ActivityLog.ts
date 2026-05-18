@@ -13,7 +13,7 @@ export interface IActivityLog extends Document {
   createdAt: Date
 }
 
-const ActivityLogSchema = new Schema<IActivityLog>({
+const ActivityLogSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User' },
   action: { type: String, required: true },
   tableName: { type: String, required: true },

@@ -1,0 +1,14 @@
+
+🎯 Target Family Code: TEST1022
+
+🧪 Testing Scenario 1: Root with > 1 member...
+✅ Scenario 1 Passed: Restriction enforced.
+
+🧪 Testing Scenario 2: Root with 1 member...
+✅ Scenario 2 Passed: Migration successful.
+   - User familyCode updated.
+   - Old tree marked inactive.
+
+🧪 Testing Scenario 3: Regular Member...
+✅ Scenario 3 Passed: Member migration successful.
+   - Member familyCode updated.

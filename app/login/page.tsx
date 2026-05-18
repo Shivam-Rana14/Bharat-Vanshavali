@@ -24,10 +24,10 @@ export default function LoginPage() {
     loginId: "",
     password: ""
   })
-  
+
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   const { login, user, isLoading } = useAuth()
   const { showLoading, hideLoading } = useLoading()
   const { toast } = useToast()
@@ -57,9 +57,9 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (isSubmitting) return
-    
+
     // Validate form
     const validation = validateLoginForm(formData)
     if (!validation.isValid) {
@@ -70,10 +70,10 @@ export default function LoginPage() {
       setErrors(newErrors)
       return
     }
-    
+
     // Clear previous errors
     setErrors({})
-    
+
     // Check network status
     if (!isOnline) {
       toast({
@@ -83,10 +83,10 @@ export default function LoginPage() {
       })
       return
     }
-    
+
     setIsSubmitting(true)
     showLoading("Authenticating...")
-    
+
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -105,7 +105,7 @@ export default function LoginPage() {
       if (result.success) {
         // Set user in auth context
         login(result.user)
-        
+
         // Redirect immediately – toast will flash quickly but avoid cookie race
         if (result.user.type === 'admin') {
           window.location.href = '/admin/dashboard'
@@ -175,32 +175,22 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="loginId">
-                    {loginType === "admin" ? "Admin ID" : "Login ID or Email"}
+                    {loginType === "admin" ? "Admin ID" : "Email ID or Unique Login ID"}
                   </Label>
                   <Input
                     id="loginId"
                     type="text"
-                    placeholder={loginType === "admin" ? "Enter admin ID" : "Enter your Login ID (e.g., BV123456) or Email"}
+                    placeholder={loginType === "admin" ? "Enter admin ID" : "Enter your Email ID or Unique Login ID"}
                     value={formData.loginId}
-                    onChange={(e) => setFormData({...formData, loginId: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, loginId: e.target.value })}
                     className={errors.loginId ? "border-red-500" : ""}
                     required
                   />
                   {errors.loginId && (
                     <p className="text-sm text-red-500 mt-1">{errors.loginId}</p>
                   )}
-                  {loginType === "citizen" && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-500">
-                        💡 You can use either your <strong>unique Login ID</strong> (like BV123456) or your <strong>email address</strong>
-                      </p>
-                      <p className="text-xs text-blue-600">
-                        📧 Your Login ID was provided after registration - check your records!
-                      </p>
-                    </div>
-                  )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
@@ -209,7 +199,7 @@ export default function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       value={formData.password}
-                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       className={errors.password ? "border-red-500" : ""}
                       required
                     />
@@ -238,14 +228,14 @@ export default function LoginPage() {
                   </Link>
                 </div>
 
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={isSubmitting || !isOnline}
                   className="w-full bg-gradient-to-r from-orange-500 to-green-600 hover:from-orange-600 hover:to-green-700 disabled:opacity-50"
                 >
                   {isSubmitting ? "Signing In..." : `Sign In as ${loginType === "admin" ? "Admin" : "Citizen"}`}
                 </Button>
-                
+
                 {!isOnline && (
                   <div className="text-center text-sm text-red-500 mt-2">
                     No internet connection. Please check your connection.

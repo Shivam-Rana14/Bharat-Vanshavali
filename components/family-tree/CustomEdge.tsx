@@ -4,6 +4,13 @@ import { EdgeProps, getBezierPath, EdgeLabelRenderer, BaseEdge } from '@xyflow/r
 import { memo } from 'react'
 import { COLORS } from '@/lib/constants'
 
+interface EdgeData extends Record<string, unknown> {
+  sourceHandle?: string
+  targetHandle?: string
+  relationshipType?: string
+  relationshipLabel?: string
+}
+
 // CSS for edge labels
 const edgeLabelStyles = `
   .custom-edge-label {
@@ -43,12 +50,13 @@ const CustomEdge = memo(({
   label,
   markerEnd 
 }: EdgeProps) => {
+  const edgeData = data as EdgeData | undefined
   
   // Force logging to ensure component is being called
   console.log(`🎯 CustomEdge rendering for connection "${id}":`, {
     id,
-    sourceHandle: data?.sourceHandle,
-    targetHandle: data?.targetHandle,
+    sourceHandle: edgeData?.sourceHandle,
+    targetHandle: edgeData?.targetHandle,
     label,
     sourcePosition: { x: sourceX, y: sourceY },
     targetPosition: { x: targetX, y: targetY },
@@ -56,20 +64,20 @@ const CustomEdge = memo(({
   })
 
   // Determine if this is a horizontal connection based on handle names
-  const isHorizontalConnection = 
-    (data?.sourceHandle?.includes('left') || data?.sourceHandle?.includes('right')) ||
-    (data?.targetHandle?.includes('left') || data?.targetHandle?.includes('right'))
+  const isHorizontalConnection: boolean = !!((
+    edgeData?.sourceHandle?.includes('left') || edgeData?.sourceHandle?.includes('right')) ||
+    (edgeData?.targetHandle?.includes('left') || edgeData?.targetHandle?.includes('right')))
   
   // Determine if this is a vertical connection based on handle names
-  const isVerticalConnection = 
-    (data?.sourceHandle?.includes('top') || data?.sourceHandle?.includes('bottom')) ||
-    (data?.targetHandle?.includes('top') || data?.targetHandle?.includes('bottom'))
+  const isVerticalConnection: boolean = !!((
+    edgeData?.sourceHandle?.includes('top') || edgeData?.sourceHandle?.includes('bottom')) ||
+    (edgeData?.targetHandle?.includes('top') || edgeData?.targetHandle?.includes('bottom')))
 
   console.log('Connection type detection:', {
     isHorizontalConnection,
     isVerticalConnection,
-    sourceHandle: data?.sourceHandle,
-    targetHandle: data?.targetHandle
+    sourceHandle: edgeData?.sourceHandle,
+    targetHandle: edgeData?.targetHandle
   })
 
   // Calculate the path based on connection type

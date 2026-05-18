@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = requireAuth(request)
     const { searchParams } = new URL(request.url)
-    const familyCode = searchParams.get('familyCode')
+    let familyCode = searchParams.get('familyCode')
     const action = searchParams.get('action') || 'get'
 
     if (action === 'all' && user.type === 'admin') {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     if (action === 'update') {
       // Update/refresh the family member arrays
-      const result = await databaseService.updateFamilyMemberArrays(familyCode)
+      const result = await databaseService.updateFamilyMemberArrays(familyCode!)
       return NextResponse.json({
         success: true,
         message: 'Family member arrays updated successfully',
@@ -46,12 +46,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Get family member arrays
-    const familyArrays = await databaseService.getFamilyMemberArrays(familyCode)
+    const familyArrays = await databaseService.getFamilyMemberArrays(familyCode!)
     
     if (!familyArrays) {
       // If arrays don't exist, create them
-      await databaseService.updateFamilyMemberArrays(familyCode)
-      const newFamilyArrays = await databaseService.getFamilyMemberArrays(familyCode)
+      await databaseService.updateFamilyMemberArrays(familyCode!)
+      const newFamilyArrays = await databaseService.getFamilyMemberArrays(familyCode!)
       
       return NextResponse.json({
         success: true,

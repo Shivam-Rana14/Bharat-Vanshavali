@@ -17,7 +17,8 @@ export async function GET(
       )
     }
 
-    const documents = await databaseService.getUserDocuments(params.userId)
+    // Documents are no longer supported in this system
+    const documents: any[] = []
 
     return NextResponse.json({ 
       success: true, 

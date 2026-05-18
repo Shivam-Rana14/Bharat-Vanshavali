@@ -13,7 +13,7 @@ export interface INotification extends Document {
   createdAt: Date
 }
 
-const NotificationSchema = new Schema<INotification>({
+const NotificationSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   type: { 
     type: String, 
@@ -33,5 +33,7 @@ const NotificationSchema = new Schema<INotification>({
 // Index for better performance
 NotificationSchema.index({ userId: 1, read: 1 })
 NotificationSchema.index({ createdAt: -1 })
+// Auto-delete notifications after 30 days (safety net — manual dismiss deletes immediately)
+NotificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 })
 
 export default mongoose.models.Notification || mongoose.model<INotification>('Notification', NotificationSchema)

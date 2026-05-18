@@ -101,7 +101,7 @@ interface FamilyTreeData {
 export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
   const { user } = useAuth()
   const { toast } = useToast()
-  
+
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [familyTree, setFamilyTree] = useState<FamilyTreeData | null>(null)
@@ -119,80 +119,80 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
 
   // Comprehensive relationship options supporting all cardinalities (1:1, 1:M, M:1, M:M, 0)
   const relationshipOptions = [
-    { 
-      type: 'parent-child', 
+    {
+      type: 'parent-child',
       labels: ['Father', 'Mother', 'Parent', 'Son', 'Daughter', 'Child'],
       cardinality: '1:M (One parent can have many children)',
       displayName: 'Parent'
     },
-    { 
-      type: 'spouse', 
+    {
+      type: 'spouse',
       labels: ['Husband', 'Wife', 'Spouse', 'Partner'],
       cardinality: '1:1 or 1:M (Monogamous or polygamous relationships)',
       displayName: 'Spouse'
     },
-    { 
-      type: 'sibling', 
+    {
+      type: 'sibling',
       labels: ['Brother', 'Sister', 'Sibling', 'Twin'],
       cardinality: 'M:M (Many siblings can relate to many siblings)',
       displayName: 'Sibling'
     },
-    { 
-      type: 'grandparent-grandchild', 
+    {
+      type: 'grandparent-grandchild',
       labels: ['Grandfather', 'Grandmother', 'Grandparent', 'Grandson', 'Granddaughter', 'Grandchild'],
       cardinality: '1:M (One grandparent can have many grandchildren)',
       displayName: 'Grandparent'
     },
-    { 
-      type: 'uncle-nephew', 
+    {
+      type: 'uncle-nephew',
       labels: ['Uncle', 'Aunt', 'Nephew', 'Niece'],
       cardinality: '1:M (One uncle/aunt can have many nephews/nieces)',
       displayName: 'Uncle/Aunt'
     },
-    { 
-      type: 'cousin', 
+    {
+      type: 'cousin',
       labels: ['Cousin', 'First Cousin', 'Second Cousin'],
       cardinality: 'M:M (Many cousins can relate to many cousins)',
       displayName: 'Cousin'
     },
-    { 
-      type: 'in-law', 
+    {
+      type: 'in-law',
       labels: ['Father-in-law', 'Mother-in-law', 'Son-in-law', 'Daughter-in-law', 'Brother-in-law', 'Sister-in-law'],
       cardinality: 'M:M (Multiple in-law relationships possible)',
       displayName: 'In-Law'
     },
-    { 
-      type: 'step-family', 
+    {
+      type: 'step-family',
       labels: ['Stepfather', 'Stepmother', 'Stepson', 'Stepdaughter', 'Stepbrother', 'Stepsister'],
       cardinality: 'M:M (Multiple step relationships possible)',
       displayName: 'Step Family'
     },
-    { 
-      type: 'adopted', 
+    {
+      type: 'adopted',
       labels: ['Adoptive Father', 'Adoptive Mother', 'Adopted Son', 'Adopted Daughter'],
       cardinality: '1:M (One adoptive parent can have many adopted children)',
       displayName: 'Adopted'
     },
-    { 
-      type: 'guardian-ward', 
+    {
+      type: 'guardian-ward',
       labels: ['Guardian', 'Ward', 'Legal Guardian'],
       cardinality: '1:M (One guardian can have many wards)',
       displayName: 'Guardian'
     },
-    { 
-      type: 'friend', 
+    {
+      type: 'friend',
       labels: ['Friend', 'Best Friend', 'Close Friend', 'Family Friend'],
       cardinality: 'M:M (Many friends can relate to many friends)',
       displayName: 'Friend'
     },
-    { 
-      type: 'business', 
+    {
+      type: 'business',
       labels: ['Business Partner', 'Co-founder', 'Colleague', 'Associate'],
       cardinality: 'M:M (Multiple business relationships possible)',
       displayName: 'Business'
     },
-    { 
-      type: 'other', 
+    {
+      type: 'other',
       labels: ['Custom Relationship'],
       cardinality: 'Any (Flexible for custom relationships)',
       displayName: 'Other'
@@ -209,7 +209,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
     try {
       setEnsuringNodes(true)
       console.log('Ensuring nodes for family:', familyCode)
-      
+
       const response = await fetch('/api/family-tree/ensure-nodes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -217,14 +217,14 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         toast({
           title: "Nodes Ensured",
           description: `${result.created || 0} missing nodes created. ${result.cleaned || 0} duplicate nodes removed.`,
           variant: "default"
         })
-        
+
         // Refresh the tree to show new nodes
         await fetchFamilyTreeData(false)
       } else {
@@ -254,19 +254,19 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
           'Pragma': 'no-cache'
         }
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         console.log('Family tree API response:', data)
         if (data.success) {
           console.log(`Received ${data.nodes?.length || 0} nodes and ${data.edges?.length || 0} edges`)
-          
+
           // Check if we need to ensure nodes for missing family members
           const nodeCount = data.nodes?.length || 0
           const familyMemberCount = data.familyTree?.memberCount || 0
-          
+
           console.log(`Node count: ${nodeCount}, Family member count: ${familyMemberCount}`)
-          
+
           // Auto-trigger ensureNodes if nodes are missing and we're refreshing
           if (autoEnsureNodes && nodeCount < familyMemberCount) {
             console.log('Missing nodes detected, triggering ensureNodesForFamily...')
@@ -275,14 +275,14 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
               description: `Found ${familyMemberCount - nodeCount} missing nodes. Creating them now...`,
               variant: "default"
             })
-            
+
             // Trigger node creation
             await ensureNodesForFamily()
-            
+
             // Refetch data after ensuring nodes
             return fetchFamilyTreeData(false) // Prevent infinite loop
           }
-          
+
           // Check if new members joined
           if (lastNodeCount > 0 && nodeCount > lastNodeCount) {
             const newMemberCount = nodeCount - lastNodeCount
@@ -293,7 +293,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
             })
           }
           setLastNodeCount(nodeCount)
-          
+
           setFamilyTree(data.familyTree)
           setNodes(data.nodes)
           setEdges(data.edges)
@@ -316,7 +316,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
   const onConnect = useCallback(
     async (params: Connection) => {
       console.log('onConnect triggered with params:', params)
-      
+
       if (!familyTree?.isUserRoot) {
         console.log('Permission denied - user is not root')
         toast({
@@ -350,31 +350,31 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
         sourceHandle: params.sourceHandle,
         targetHandle: params.targetHandle,
         isVertical: (params.sourceHandle?.includes('top') || params.sourceHandle?.includes('bottom')) ||
-                   (params.targetHandle?.includes('top') || params.targetHandle?.includes('bottom')),
+          (params.targetHandle?.includes('top') || params.targetHandle?.includes('bottom')),
         isHorizontal: (params.sourceHandle?.includes('left') || params.sourceHandle?.includes('right')) ||
-                     (params.targetHandle?.includes('left') || params.targetHandle?.includes('right'))
+          (params.targetHandle?.includes('left') || params.targetHandle?.includes('right'))
       })
 
       // Fix handle types - React Flow requires source->target, not target->target
       let correctedSourceHandle = params.sourceHandle
       let correctedTargetHandle = params.targetHandle
-      
+
       // If sourceHandle is a target, convert it to corresponding source
       if (params.sourceHandle?.includes('-target')) {
         correctedSourceHandle = params.sourceHandle.replace('-target', '-source')
         console.log(`🔧 Corrected sourceHandle: ${params.sourceHandle} → ${correctedSourceHandle}`)
       }
-      
+
       // If targetHandle is a source, convert it to corresponding target  
       if (params.targetHandle?.includes('-source')) {
         correctedTargetHandle = params.targetHandle.replace('-source', '-target')
         console.log(`🔧 Corrected targetHandle: ${params.targetHandle} → ${correctedTargetHandle}`)
       }
-      
+
       console.log('Final corrected handles:', {
         originalSource: params.sourceHandle,
         correctedSource: correctedSourceHandle,
-        originalTarget: params.targetHandle, 
+        originalTarget: params.targetHandle,
         correctedTarget: correctedTargetHandle
       })
 
@@ -396,7 +396,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
 
         const result = await response.json()
         console.log('Connection API response:', result)
-        
+
         if (result.success) {
           // Refresh the family tree data to get the real connection with proper ID
           await fetchFamilyTreeData()
@@ -486,7 +486,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
       })
       return
     }
-    
+
     // Check if it's a right-click (context menu) or regular click
     if (event.button === 2 || event.ctrlKey || event.metaKey) {
       // Right-click or Ctrl+click - show delete dialog
@@ -511,18 +511,18 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
 
     try {
       // Update the edge in the UI immediately
-      setEdges((eds: any) => 
-        eds.map((edge: any) => 
-          edge.id === editingEdge.edge.id 
-            ? { 
-                ...edge, 
-                label: relationshipLabel,
-                data: { 
-                  ...(edge.data || {}), 
-                  relationshipType: relationshipType,
-                  relationshipLabel: relationshipLabel 
-                }
+      setEdges((eds: any) =>
+        eds.map((edge: any) =>
+          edge.id === editingEdge.edge.id
+            ? {
+              ...edge,
+              label: relationshipLabel,
+              data: {
+                ...(edge.data || {}),
+                relationshipType: relationshipType,
+                relationshipLabel: relationshipLabel
               }
+            }
             : edge
         )
       )
@@ -657,7 +657,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
     <div className="h-screen flex flex-col">
       {/* Custom styles for handles */}
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-      
+
       {/* Header */}
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -671,33 +671,35 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
             </Badge>
           )}
         </div>
-        
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      console.log('Manual refresh triggered with auto-ensure')
-                      fetchFamilyTreeData(true) // Enable auto-ensure on manual refresh
-                    }}
-                    disabled={loading}
-                    className="bg-blue-50 hover:bg-blue-100 border-blue-200"
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-                    {loading ? 'Refreshing...' : 'Refresh Tree'}
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={ensureNodesForFamily}
-                    disabled={ensuringNodes || loading}
-                    className="bg-green-50 hover:bg-green-100 border-green-200"
-                  >
-                    <Plus className={`w-4 h-4 mr-1 ${ensuringNodes ? 'animate-spin' : ''}`} />
-                    {ensuringNodes ? 'Ensuring...' : 'Ensure Nodes'}
-                  </Button>
-          
+
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              console.log('Manual refresh triggered with auto-ensure')
+              fetchFamilyTreeData(true) // Enable auto-ensure on manual refresh
+            }}
+            disabled={loading}
+            className="bg-blue-50 hover:bg-blue-100 border-blue-200"
+          >
+            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Refreshing...' : 'Refresh Tree'}
+          </Button>
+
+          {familyTree?.isUserRoot && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={ensureNodesForFamily}
+              disabled={ensuringNodes || loading}
+              className="bg-green-50 hover:bg-green-100 border-green-200"
+            >
+              <Plus className={`w-4 h-4 mr-1 ${ensuringNodes ? 'animate-spin' : ''}`} />
+              {ensuringNodes ? 'Ensuring...' : 'Ensure Nodes'}
+            </Button>
+          )}
+
           {familyTree?.isUserRoot && (
             <>
               <Button
@@ -711,8 +713,8 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
                 <Link className="w-4 h-4 mr-1" />
                 {connectionMode ? 'Cancel Connect' : 'Connect Members'}
               </Button>
-              
-              
+
+
               <Button
                 variant="outline"
                 size="sm"
@@ -731,35 +733,35 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
       {connectionMode && (
         <div className="bg-blue-50 border-b px-4 py-2">
           <p className="text-sm text-blue-800">
-            {pendingConnection 
+            {pendingConnection
               ? '🔗 Click on a TARGET handle (📥) on another member to complete the connection'
               : '🎯 Click on a SOURCE handle (📤) on a family member to start connecting them. Hover over dots to see SOURCE/TARGET labels!'
             }
           </p>
         </div>
       )}
-      
-              {/* Drag Connection Instructions */}
-              {!connectionMode && familyTree?.isUserRoot && (
-                <div className="bg-purple-50 border-b px-4 py-2">
-                  <p className="text-sm text-purple-800">
-                    💡 <strong>To connect family members:</strong> Drag from a SOURCE handle (📤) to a TARGET handle (📥). 🔵 Blue dots (top/bottom) = Vertical connections, 🟣 Purple dots (left/right) = Horizontal connections. <strong>Hover over any dot to see SOURCE/TARGET labels!</strong>
-                  </p>
-                </div>
-              )}
+
+      {/* Drag Connection Instructions */}
+      {!connectionMode && familyTree?.isUserRoot && (
+        <div className="bg-purple-50 border-b px-4 py-2">
+          <p className="text-sm text-purple-800">
+            💡 <strong>To connect family members:</strong> Drag from a SOURCE handle (📤) to a TARGET handle (📥). 🔵 Blue dots (top/bottom) = Vertical connections, 🟣 Purple dots (left/right) = Horizontal connections. <strong>Hover over any dot to see SOURCE/TARGET labels!</strong>
+          </p>
+        </div>
+      )}
 
       {/* React Flow */}
       <div className="flex-1">
-                <ReactFlow
-                  nodes={nodes}
-                  edges={edges}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  onConnect={onConnect}
-                  onNodeClick={onNodeClick}
-                  onEdgeClick={onEdgeClick}
-                  nodeTypes={nodeTypes}
-                  edgeTypes={edgeTypes}
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           attributionPosition="top-right"
           nodesDraggable={familyTree?.isUserRoot}
@@ -795,154 +797,154 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
         </ReactFlow>
       </div>
 
-       {/* Instructions */}
-                      <div className="bg-gray-50 border-t px-4 py-2">
-                        <p className="text-xs text-gray-600">
-                          {familyTree?.isUserRoot 
-                            ? '🎯 DRAG from a SOURCE handle (📤) TO a TARGET handle (📥) to connect family members. 🔵 Blue dots (top/bottom) = vertical connections, 🟣 Purple dots (left/right) = horizontal connections. Hover over dots to see SOURCE/TARGET labels!'
-                            : 'You are viewing the family tree. Only the root member can make changes.'
-                          }
-                        </p>
-                      </div>
+      {/* Instructions */}
+      <div className="bg-gray-50 border-t px-4 py-2">
+        <p className="text-xs text-gray-600">
+          {familyTree?.isUserRoot
+            ? '🎯 DRAG from a SOURCE handle (📤) TO a TARGET handle (📥) to connect family members. 🔵 Blue dots (top/bottom) = vertical connections, 🟣 Purple dots (left/right) = horizontal connections. Hover over dots to see SOURCE/TARGET labels!'
+            : 'You are viewing the family tree. Only the root member can make changes.'
+          }
+        </p>
+      </div>
 
-              {/* Edit Relationship Dialog */}
-              <Dialog open={editingEdge.isOpen} onOpenChange={(open) => setEditingEdge({ edge: null as any, isOpen: open })}>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Edit3 className="w-4 h-4" />
-                      Edit Relationship
-                    </DialogTitle>
-                    <DialogDescription>
-                      Update the relationship between these family members. You can create multiple different relationships between the same people to represent complex family dynamics.
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="relationshipType">Relationship Type</Label>
-                      <Select value={relationshipType} onValueChange={setRelationshipType}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select relationship type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {relationshipOptions.map((option) => (
-                            <SelectItem key={option.type} value={option.type}>
-                              <div className="flex flex-col">
-                                <span className="font-medium">
-                                  {option.displayName}
-                                </span>
-                                <span className="text-xs text-gray-500">{option.cardinality}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="grid gap-2">
-                      <Label htmlFor="relationshipLabel">Relationship Label</Label>
-                      <Input
-                        id="relationshipLabel"
-                        value={relationshipLabel}
-                        onChange={(e) => setRelationshipLabel(e.target.value)}
-                        placeholder="e.g., Father, Mother, Brother, Sister, Husband, Wife"
-                        className="w-full"
-                      />
-                      <p className="text-xs text-gray-500">
-                        This is what will be displayed on the connection line.
-                      </p>
-                    </div>
+      {/* Edit Relationship Dialog */}
+      <Dialog open={editingEdge.isOpen} onOpenChange={(open) => setEditingEdge({ edge: null as any, isOpen: open })}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="w-4 h-4" />
+              Edit Relationship
+            </DialogTitle>
+            <DialogDescription>
+              Update the relationship between these family members. You can create multiple different relationships between the same people to represent complex family dynamics.
+            </DialogDescription>
+          </DialogHeader>
 
-                    {/* Quick suggestions based on selected type */}
-                    {relationshipType && (
-                      <div className="grid gap-2">
-                        <Label className="text-xs">Quick suggestions:</Label>
-                        <div className="flex flex-wrap gap-1">
-                          {relationshipOptions
-                            .find(opt => opt.type === relationshipType)
-                            ?.labels.map((label) => (
-                              <Button
-                                key={label}
-                                variant="outline"
-                                size="sm"
-                                className="text-xs h-6 px-2"
-                                onClick={() => setRelationshipLabel(label)}
-                              >
-                                {label}
-                              </Button>
-                            ))}
-                        </div>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="relationshipType">Relationship Type</Label>
+              <Select value={relationshipType} onValueChange={setRelationshipType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select relationship type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {relationshipOptions.map((option) => (
+                    <SelectItem key={option.type} value={option.type}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {option.displayName}
+                        </span>
+                        <span className="text-xs text-gray-500">{option.cardinality}</span>
                       </div>
-                    )}
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setEditingEdge({ edge: null as any, isOpen: false })}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      onClick={() => {
-                        setEditingEdge({ edge: null as any, isOpen: false })
-                        setDeletingEdge({ edge: editingEdge.edge, isOpen: true })
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Delete
-                    </Button>
-                    <Button onClick={updateRelationship}>
-                      Update Relationship
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              {/* Delete Connection Confirmation Dialog */}
-              <Dialog open={deletingEdge.isOpen} onOpenChange={(open) => setDeletingEdge({ edge: null as any, isOpen: open })}>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                      Delete Connection
-                    </DialogTitle>
-                    <DialogDescription>
-                      Are you sure you want to delete this relationship? This action cannot be undone.
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="py-4">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <div className="flex items-center gap-2 text-red-800">
-                        <Trash2 className="w-4 h-4" />
-                        <span className="font-medium">Connection to be deleted:</span>
-                      </div>
-                      <p className="text-red-700 mt-1">
-                        "{deletingEdge.edge?.label || 'Unknown relationship'}"
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setDeletingEdge({ edge: null as any, isOpen: false })}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      onClick={deleteConnection}
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Delete Connection
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+            <div className="grid gap-2">
+              <Label htmlFor="relationshipLabel">Relationship Label</Label>
+              <Input
+                id="relationshipLabel"
+                value={relationshipLabel}
+                onChange={(e) => setRelationshipLabel(e.target.value)}
+                placeholder="e.g., Father, Mother, Brother, Sister, Husband, Wife"
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500">
+                This is what will be displayed on the connection line.
+              </p>
+            </div>
+
+            {/* Quick suggestions based on selected type */}
+            {relationshipType && (
+              <div className="grid gap-2">
+                <Label className="text-xs">Quick suggestions:</Label>
+                <div className="flex flex-wrap gap-1">
+                  {relationshipOptions
+                    .find(opt => opt.type === relationshipType)
+                    ?.labels.map((label) => (
+                      <Button
+                        key={label}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-6 px-2"
+                        onClick={() => setRelationshipLabel(label)}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditingEdge({ edge: null as any, isOpen: false })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setEditingEdge({ edge: null as any, isOpen: false })
+                setDeletingEdge({ edge: editingEdge.edge, isOpen: true })
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Delete
+            </Button>
+            <Button onClick={updateRelationship}>
+              Update Relationship
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Connection Confirmation Dialog */}
+      <Dialog open={deletingEdge.isOpen} onOpenChange={(open) => setDeletingEdge({ edge: null as any, isOpen: open })}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-red-600" />
+              Delete Connection
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this relationship? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-red-800">
+                <Trash2 className="w-4 h-4" />
+                <span className="font-medium">Connection to be deleted:</span>
+              </div>
+              <p className="text-red-700 mt-1">
+                "{deletingEdge.edge?.label || 'Unknown relationship'}"
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeletingEdge({ edge: null as any, isOpen: false })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteConnection}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Delete Connection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

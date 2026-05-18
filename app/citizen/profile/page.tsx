@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  FileText, 
-  Shield, 
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  FileText,
+  Shield,
   Edit,
   Download,
   Eye,
@@ -23,19 +23,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { DocumentUploadModal } from "@/components/ui/document-upload-modal"
 
-interface UserDocument {
-  _id: string
-  title: string
-  documentType: string
-  fileName: string
-  fileSize: number
-  mimeType: string
-  fileData: string
-  isPublic: boolean
-  createdAt: string
-}
 
 interface UserProfile {
   id: string
@@ -55,6 +43,8 @@ interface UserProfile {
   nativePlace?: string
   caste?: string
   createdAt: string
+  aadhaarNumber?: string
+  panNumber?: string
 }
 
 export default function ProfilePage() {
@@ -63,8 +53,6 @@ export default function ProfilePage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [profileData, setProfileData] = useState<UserProfile | null>(null)
-  const [documents, setDocuments] = useState<UserDocument[]>([])
-  const [uploadModalOpen, setUploadModalOpen] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -72,7 +60,6 @@ export default function ProfilePage() {
       return
     }
     fetchProfileData()
-    fetchDocuments()
   }, [user])
 
   const fetchProfileData = async () => {
@@ -97,71 +84,6 @@ export default function ProfilePage() {
     }
   }
 
-  const fetchDocuments = async () => {
-    try {
-      // Fetch documents uploaded by the user
-      const response = await fetch(`/api/documents/user/${user?.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Documents API response:', data)
-        if (data.success) {
-          setDocuments(data.documents || [])
-        }
-      } else {
-        console.error('Documents API error:', response.status, response.statusText)
-      }
-    } catch (error) {
-      console.error('Failed to fetch documents:', error)
-    }
-  }
-
-  const handleDownloadDocument = (doc: UserDocument) => {
-    try {
-      // Create a download link from base64 data
-      const link = document.createElement('a')
-      link.href = doc.fileData
-      link.download = doc.fileName
-      link.click()
-      
-      toast({
-        title: "Download Started",
-        description: `Downloading ${doc.fileName}`,
-        variant: "default"
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to download document",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const handleViewDocument = (doc: UserDocument) => {
-    // Open document in a new tab
-    const newWindow = window.open()
-    if (newWindow) {
-      newWindow.document.write(`
-        <html>
-          <head>
-            <title>${doc.fileName}</title>
-            <style>
-              body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; }
-              img { max-width: 100%; height: auto; }
-              iframe { width: 100%; height: 100vh; border: none; }
-            </style>
-          </head>
-          <body>
-            ${doc.mimeType.startsWith('image/') 
-              ? `<img src="${doc.fileData}" alt="${doc.fileName}" />`
-              : `<iframe src="${doc.fileData}"></iframe>`
-            }
-          </body>
-        </html>
-      `)
-    }
-  }
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not provided'
     return new Date(dateString).toLocaleDateString('en-IN', {
@@ -171,11 +93,7 @@ export default function ProfilePage() {
     })
   }
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
-  }
+
 
   if (loading) {
     return (
@@ -219,41 +137,41 @@ export default function ProfilePage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Basic Info Card */}
               <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
-                      {user?.avatar ? (
-                        <img 
-                          src={user.avatar} 
-                          alt={profileData.fullName} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <User className="w-8 h-8 text-white" />
-                      )}
-                    </div>
-                    <div>
-                      <CardTitle className="text-2xl">{profileData.fullName}</CardTitle>
-                      <CardDescription className="flex items-center space-x-2 mt-1">
-                        <Badge variant={profileData.verificationStatus === 'verified' ? 'default' : 'secondary'}
-                               className={profileData.verificationStatus === 'verified' 
-                                 ? 'bg-green-100 text-green-800' 
-                                 : 'bg-orange-100 text-orange-800'}>
-                          {profileData.verificationStatus === 'verified' ? (
-                            <>
-                              <Shield className="w-3 h-3 mr-1" />
-                              Verified
-                            </>
-                          ) : (
-                            'Pending Verification'
-                          )}
-                        </Badge>
-                      </CardDescription>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                        {user?.avatar ? (
+                          <img
+                            src={user.avatar}
+                            alt={profileData.fullName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <User className="w-8 h-8 text-white" />
+                        )}
+                      </div>
+                      <div>
+                        <CardTitle className="text-2xl">{profileData.fullName}</CardTitle>
+                        <CardDescription className="flex items-center space-x-2 mt-1">
+                          <Badge variant={profileData.verificationStatus === 'verified' ? 'default' : 'secondary'}
+                            className={profileData.verificationStatus === 'verified'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-orange-100 text-orange-800'}>
+                            {profileData.verificationStatus === 'verified' ? (
+                              <>
+                                <Shield className="w-3 h-3 mr-1" />
+                                Verified
+                              </>
+                            ) : (
+                              'Pending Verification'
+                            )}
+                          </Badge>
+                        </CardDescription>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardHeader>
+                </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
@@ -373,77 +291,38 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Documents Section */}
+              {/* Identity Documents Section */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>My Documents</CardTitle>
-                      <CardDescription>
-                        Your uploaded documents and certificates
-                      </CardDescription>
-                    </div>
-                    <Button onClick={() => setUploadModalOpen(true)} className="bg-orange-600 hover:bg-orange-700">
-                      <FileText className="w-4 h-4 mr-2" />
-                      Upload Document
-                    </Button>
-                  </div>
+                  <CardTitle>Identity Documents</CardTitle>
+                  <CardDescription>
+                    Your verified identity details
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {documents.length === 0 ? (
-                    <div className="text-center py-8">
-                      <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                      <p className="text-gray-500">No documents uploaded yet</p>
-                      <Button 
-                        onClick={() => setUploadModalOpen(true)}
-                        variant="outline" 
-                        className="mt-4"
-                      >
-                        Upload Your First Document
-                      </Button>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <Shield className="w-5 h-5 text-orange-600" />
+                        <h3 className="font-semibold text-orange-900">Aadhaar Card</h3>
+                      </div>
+                      <p className="text-sm text-orange-700 mb-1">Aadhaar Number</p>
+                      <p className="font-mono text-lg font-medium text-orange-950">
+                        {profileData.aadhaarNumber || 'Not provided'}
+                      </p>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {documents.map((doc) => (
-                        <div 
-                          key={doc._id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center space-x-3 flex-1">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <FileText className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-semibold">{doc.title}</h4>
-                              <div className="flex items-center space-x-3 text-sm text-gray-500">
-                                <span className="capitalize">{doc.documentType.replace('_', ' ')}</span>
-                                <span>•</span>
-                                <span>{formatFileSize(doc.fileSize)}</span>
-                                <span>•</span>
-                                <span>{formatDate(doc.createdAt)}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewDocument(doc)}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDownloadDocument(doc)}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                        <h3 className="font-semibold text-blue-900">PAN Card</h3>
+                      </div>
+                      <p className="text-sm text-blue-700 mb-1">PAN Number</p>
+                      <p className="font-mono text-lg font-medium text-blue-950">
+                        {profileData.panNumber || 'Not provided'}
+                      </p>
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -471,10 +350,7 @@ export default function ProfilePage() {
                       <span className="text-sm text-gray-600">Member Since</span>
                       <span className="text-sm font-medium">{formatDate(profileData.createdAt)}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Documents</span>
-                      <span className="text-sm font-medium">{documents.length}</span>
-                    </div>
+
                   </div>
                 </CardContent>
               </Card>
@@ -485,30 +361,23 @@ export default function ProfilePage() {
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start"
                     onClick={() => router.push('/citizen/settings')}
                   >
                     <Edit className="w-4 h-4 mr-2" />
                     Edit Profile
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start"
                     onClick={() => router.push('/citizen/family-tree')}
                   >
                     <User className="w-4 h-4 mr-2" />
                     View Family Tree
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start"
-                    onClick={() => setUploadModalOpen(true)}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Upload Document
-                  </Button>
+
                 </CardContent>
               </Card>
             </div>
@@ -516,19 +385,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Document Upload Modal */}
-      <DocumentUploadModal
-        isOpen={uploadModalOpen}
-        onClose={() => setUploadModalOpen(false)}
-        onUploadSuccess={() => {
-          fetchDocuments()
-          toast({
-            title: "Success",
-            description: "Document uploaded successfully",
-            variant: "default"
-          })
-        }}
-      />
+
     </>
   )
 }

@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { databaseService, SignUpData } from '@/lib/mongodb/database'
 import { authService } from '@/lib/auth'
-async function processAvatarFile(file: File): Promise<string> {
-  // Convert file to base64
-  const arrayBuffer = await file.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-  const base64String = `data:${file.type};base64,${buffer.toString('base64')}`
-  
-  return base64String
-}
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
-    
+
     const signUpData: SignUpData = {
       email: formData.get('email') as string,
       password: formData.get('password') as string,
@@ -30,12 +22,15 @@ export async function POST(request: NextRequest) {
       reference2Phone: formData.get('reference2Mobile') as string,
       familyCode: formData.get('familyCode') as string,
       relationship: formData.get('relationship') as string,
-      selfieFile: (formData.get('selfieFile') as File) || null,
-      location: (formData.get('latitude') && formData.get('longitude')) ? {
-        lat: Number(formData.get('latitude') as string),
-        lng: Number(formData.get('longitude') as string)
-      } : null,
+      aadhaarNumber: formData.get('aadhaarNumber') as string,
+      panNumber: formData.get('panNumber') as string,
     }
+
+    console.log('Register API received:', {
+      email: signUpData.email,
+      aadhaar: signUpData.aadhaarNumber,
+      pan: signUpData.panNumber
+    })
 
     // Validate required fields
     if (!signUpData.email || !signUpData.password || !signUpData.fullName) {
@@ -55,19 +50,6 @@ export async function POST(request: NextRequest) {
 
     // Create user with MongoDB
     const newUser = await databaseService.signUp(signUpData)
-
-    // Process and store selfie in database if provided
-    if (signUpData.selfieFile) {
-      try {
-        const avatarData = await processAvatarFile(signUpData.selfieFile as File)
-        newUser.avatarData = avatarData
-        newUser.avatarUrl = 'database' // Indicate avatar is stored in database
-        await newUser.save()
-      } catch (e) {
-        // Non-blocking: log only
-        console.error('Selfie processing failed:', e)
-      }
-    }
 
     // Generate JWT token
     const token = authService.generateToken({
@@ -106,14 +88,5 @@ export async function POST(request: NextRequest) {
       { success: false, error: error instanceof Error ? error.message : 'Registration failed' },
       { status: 500 }
     )
-  }
-}
-
-// Allow larger payloads (up to 10 MB)
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb'
-    }
   }
 }

@@ -20,10 +20,11 @@ export async function POST(request: NextRequest) {
     // Call the enhanced ensureNodesForFamily function
     const result = await databaseService.ensureNodesForFamily(familyCode)
 
+    const { success: _success, ...resultData } = result
     return NextResponse.json({ 
       success: true, 
       message: 'Nodes ensured successfully',
-      ...result
+      ...resultData
     })
   } catch (error) {
     console.error('Error ensuring nodes:', error)

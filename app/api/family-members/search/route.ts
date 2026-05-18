@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const user = requireAuth(request)
 
     const { searchParams } = new URL(request.url)
-    const query = searchParams.get('q')
+    const query = searchParams.get('q')?.toLowerCase() || ''
     const relationship = searchParams.get('relationship')
     const gender = searchParams.get('gender')
     const location = searchParams.get('location')
@@ -23,16 +23,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: [] })
     }
 
-    // Search family members with filters
-    const filters = {
-      query,
-      relationship,
-      gender,
-      location
+    // Get all family members using the existing method
+    const members = await databaseService.getFamilyMembersWithSmartRelationships(familyTree._id.toString())
+
+    // Apply filters in-memory
+    let filtered = members
+
+    if (query) {
+      filtered = filtered.filter((m: any) =>
+        m.fullName?.toLowerCase().includes(query) ||
+        m.gender?.toLowerCase().includes(query)
+      )
     }
 
-    const members = await databaseService.searchFamilyMembers(familyTree._id.toString(), filters)
-    return NextResponse.json({ success: true, data: members })
+    if (gender) {
+      filtered = filtered.filter((m: any) => m.gender === gender)
+    }
+
+    if (relationship) {
+      filtered = filtered.filter((m: any) =>
+        m.relationship === relationship || m.displayRelationship === relationship
+      )
+    }
+
+    if (location) {
+      filtered = filtered.filter((m: any) =>
+        (m as any).placeOfBirth?.toLowerCase().includes(location.toLowerCase())
+      )
+    }
+
+    return NextResponse.json({ success: true, data: filtered })
   } catch (error) {
     console.error('Error searching family members:', error)
     return NextResponse.json(

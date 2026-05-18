@@ -11,7 +11,7 @@ export async function GET(
 
     // Get family member to check family membership
     const member = await databaseService.getFamilyMemberById(params.memberId) as any
-    
+
     if (!member) {
       return NextResponse.json(
         { success: false, error: 'Family member not found' },
@@ -37,11 +37,13 @@ export async function GET(
       )
     }
 
-    const documents = await databaseService.getFamilyMemberDocuments(params.memberId)
+    // Documents are no longer supported in this system
+    const documents: any[] = []
+    // const documents = await databaseService.getFamilyMemberDocuments(params.memberId)
 
-    return NextResponse.json({ 
-      success: true, 
-      documents 
+    return NextResponse.json({
+      success: true,
+      documents
     })
   } catch (error) {
     console.error('Error fetching member documents:', error)

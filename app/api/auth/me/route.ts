@@ -5,7 +5,7 @@ import { databaseService } from '@/lib/mongodb/database'
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get('auth-token')?.value
-    
+
     if (!token) {
       const response = NextResponse.json({ success: false, error: 'No token found' }, { status: 401 })
       // Prevent caching
@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
 
     // Verify token
     const payload = authService.verifyToken(token)
-    
+
     // Get user details from database
     const user = await databaseService.getUserById(payload.id)
-    
+
     if (!user) {
       const response = NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
       // Prevent caching
@@ -52,15 +52,17 @@ export async function GET(request: NextRequest) {
         grandfatherName: user.grandfatherName,
         nativePlace: user.nativePlace,
         caste: user.caste,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        aadhaarNumber: user.aadhaarNumber,
+        panNumber: user.panNumber
       }
     })
-    
+
     // Prevent caching
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
     response.headers.set('Pragma', 'no-cache')
     response.headers.set('Expires', '0')
-    
+
     return response
   } catch (error) {
     console.error('Auth check error:', error)

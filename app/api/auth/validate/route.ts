@@ -20,10 +20,20 @@ export async function POST(request: NextRequest) {
         exists = await databaseService.checkEmailExists(value)
         message = exists ? 'Email already exists' : 'Email is available'
         break
-      
+
       case 'loginId':
         exists = await databaseService.checkLoginIdExists(value)
         message = exists ? 'Login ID already exists' : 'Login ID is available'
+        break
+
+      case 'aadhaarNumber':
+        exists = await databaseService.checkAadhaarExists(value)
+        message = exists ? 'Aadhaar number already registered' : 'Aadhaar number is available'
+        break
+
+      case 'panNumber':
+        exists = await databaseService.checkPanExists(value)
+        message = exists ? 'PAN number already registered' : 'PAN number is available'
         break
 
       case 'familyCode':
@@ -50,7 +60,7 @@ export async function POST(request: NextRequest) {
         }
 
       // no break because we already returned
-      
+
       default:
         return NextResponse.json(
           { success: false, error: 'Invalid validation type' },

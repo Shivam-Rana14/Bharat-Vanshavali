@@ -9,7 +9,7 @@ export interface IUserReference extends Document {
   createdAt: Date
 }
 
-const UserReferenceSchema = new Schema<IUserReference>({
+const UserReferenceSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   referenceName: { type: String, required: true },
   referencePhone: { type: String, required: true },

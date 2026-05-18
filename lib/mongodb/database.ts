@@ -1,5 +1,6 @@
 import connectDB from './connection'
-import { User, FamilyTree, FamilyMember, FamilyTreeNode, FamilyTreeConnection, FamilyMembersByFamily, Document, Notification, UserReference } from './models'
+import { User, FamilyTree, FamilyTreeNode, FamilyTreeConnection, FamilyMembersByFamily, Notification, UserReference } from './models'
+import ActivityLog from './models/ActivityLog'
 import { authService } from '@/lib/auth'
 import { generateFamilyCode, generateLoginId } from '@/lib/utils'
 import { COLORS, DEFAULTS } from '@/lib/constants'
@@ -20,8 +21,8 @@ export interface SignUpData {
   reference2Phone?: string
   familyCode?: string
   relationship?: string // relationship with root when joining existing family
-  selfieFile?: File | Blob | null
-  location?: { lat: number; lng: number } | null
+  aadhaarNumber?: string
+  panNumber?: string
 }
 
 export const databaseService = {
@@ -38,10 +39,22 @@ export const databaseService = {
     return !!user
   },
 
+  async checkAadhaarExists(aadhaarNumber: string): Promise<boolean> {
+    await connectDB()
+    const user = await User.findOne({ aadhaarNumber })
+    return !!user
+  },
+
+  async checkPanExists(panNumber: string): Promise<boolean> {
+    await connectDB()
+    const user = await User.findOne({ panNumber })
+    return !!user
+  },
+
   // Authentication
   async signUp(data: SignUpData) {
     await connectDB()
-    
+
     // Check if user already exists with email (comprehensive check)
     const existingUserByEmail = await User.findOne({ email: data.email })
     if (existingUserByEmail) {
@@ -50,12 +63,12 @@ export const databaseService = {
 
     // Hash password
     const hashedPassword = await authService.hashPassword(data.password)
-    
+
     // Generate unique login ID with retry mechanism
     let loginId: string
     let loginIdAttempts = 0
     const maxLoginIdAttempts = 5
-    
+
     do {
       loginId = await generateLoginId()
       const existingLoginId = await User.findOne({ loginId })
@@ -64,11 +77,11 @@ export const databaseService = {
       }
       loginIdAttempts++
     } while (loginIdAttempts < maxLoginIdAttempts)
-    
+
     if (loginIdAttempts >= maxLoginIdAttempts) {
       throw new Error('Unable to generate unique Login ID. Please try again.')
     }
-    
+
     // Handle family code - use provided one or generate new one
     let familyCode = data.familyCode?.trim()
 
@@ -103,8 +116,8 @@ export const databaseService = {
         nativePlace: data.nativePlace,
         caste: data.caste,
         familyCode,
-        signupLatitude: data.location?.lat,
-        signupLongitude: data.location?.lng
+        aadhaarNumber: data.aadhaarNumber,
+        panNumber: data.panNumber
       })
 
       const savedUser = await user.save()
@@ -146,13 +159,13 @@ export const databaseService = {
         if (existingTree) {
           // Add user as an unconnected node (root will connect them later)
           const nodeCount = await FamilyTreeNode.countDocuments({ familyTreeId: existingTree._id })
-          
+
           await new FamilyTreeNode({
             familyTreeId: existingTree._id,
             userId: savedUser._id,
-            position: { 
+            position: {
               x: (nodeCount % 5) * 250, // Arrange in a grid pattern
-              y: Math.floor(nodeCount / 5) * 150 
+              y: Math.floor(nodeCount / 5) * 150
             },
             nodeData: {
               width: 200,
@@ -162,10 +175,7 @@ export const databaseService = {
             }
           }).save()
 
-          // Update family tree member count
-          await FamilyTree.findByIdAndUpdate(existingTree._id, {
-            $inc: { memberCount: 1 }
-          })
+          // memberCount will be recalculated by updateFamilyMemberArrays (line 204)
         }
       }
 
@@ -210,14 +220,14 @@ export const databaseService = {
 
   async signIn(loginId: string, password: string) {
     await connectDB()
-    
+
     let user
     if (loginId.includes('@')) {
       // Login with email
       user = await User.findOne({ email: loginId })
     } else {
       // Login with loginId or familyCode (backward compatibility)
-      user = await User.findOne({ 
+      user = await User.findOne({
         $or: [
           { loginId: loginId },
           { familyCode: loginId }
@@ -243,154 +253,16 @@ export const databaseService = {
   },
 
   // Family Members
-  async getFamilyMembers(familyTreeId: string) {
-    await connectDB()
-    return FamilyMember.find({ familyTreeId })
-      .populate('userId', 'fullName email loginId phone')
-      .populate('spouseId', 'fullName')
-      .populate('fatherId', 'fullName')
-      .populate('motherId', 'fullName')
-      .sort({ createdAt: -1 })
-      .lean()
-  },
+  // REMOVED: getFamilyMembers - use getFamilyMembersWithSmartRelationships instead
+  // REMOVED: addFamilyMember - use addFamilyMemberWithRelationship instead
+  // REMOVED: deleteFamilyMember - use removeFamilyMember instead
 
-  async addFamilyMember(memberData: any, userId: string) {
-    await connectDB()
-    
-    const member = new FamilyMember({
-      ...memberData,
-      createdBy: userId
-    })
-
-    const savedMember = await member.save()
-    
-    // Create notification for family tree owner
-    const familyTree = await FamilyTree.findById(memberData.familyTreeId)
-    if (familyTree && familyTree.createdBy.toString() !== userId) {
-      await new Notification({
-        userId: familyTree.createdBy,
-        type: 'member_added',
-        title: 'New Family Member Added',
-        message: `A new family member "${memberData.fullName}" has been added to your family tree`,
-        priority: 'medium'
-      }).save()
-    }
-
-    return savedMember
-  },
-
-  async updateFamilyMember(memberId: string, updateData: any, userId: string) {
-    await connectDB()
-    
-    // In node-based system, memberId is actually a nodeId
-    const node = await FamilyTreeNode.findById(memberId).populate('userId')
-    if (!node) {
-      throw new Error('Family member not found')
-    }
-
-    // Update the user data (since most family member data is now stored in User model)
-    const userUpdateData: any = {}
-    if (updateData.fullName) userUpdateData.fullName = updateData.fullName
-    if (updateData.dateOfBirth) userUpdateData.dateOfBirth = updateData.dateOfBirth
-    if (updateData.placeOfBirth) userUpdateData.placeOfBirth = updateData.placeOfBirth
-    if (updateData.gender) userUpdateData.gender = updateData.gender
-    if (updateData.phone) userUpdateData.phone = updateData.phone
-
-    if (Object.keys(userUpdateData).length > 0) {
-      await User.findByIdAndUpdate(node.userId, userUpdateData)
-    }
-
-    // Update node data if needed (position, color, etc.)
-    const nodeUpdateData: any = {}
-    if (updateData.nodeData) nodeUpdateData.nodeData = updateData.nodeData
-
-    if (Object.keys(nodeUpdateData).length > 0) {
-      await FamilyTreeNode.findByIdAndUpdate(memberId, nodeUpdateData)
-    }
-
-    // Return updated node in expected format
-    return this.getFamilyMemberById(memberId)
-  },
-
-  async deleteFamilyMember(memberId: string, userId: string) {
-    await connectDB()
-    
-    const member = await FamilyMember.findById(memberId)
-    if (!member) {
-      throw new Error('Family member not found')
-    }
-
-    // Check if user has permission to delete
-    const familyTree = await FamilyTree.findById(member.familyTreeId)
-    if (!familyTree || familyTree.createdBy.toString() !== userId) {
-      throw new Error('Permission denied')
-    }
-
-    await FamilyMember.findByIdAndDelete(memberId)
-    return { success: true }
-  },
-
-  async searchFamilyMembers(familyTreeId: string, filters: any) {
-    await connectDB()
-    
-    let query: any = { familyTreeId }
-
-    if (filters.userId) {
-      query.userId = filters.userId
-    }
-    if (filters.query) {
-      query.fullName = { $regex: filters.query, $options: 'i' }
-    }
-    if (filters.relationship) {
-      query.relationship = filters.relationship
-    }
-    if (filters.gender) {
-      query.gender = filters.gender
-    }
-    if (filters.location) {
-      query.$or = [
-        { placeOfBirth: { $regex: filters.location, $options: 'i' } },
-        { placeOfDeath: { $regex: filters.location, $options: 'i' } }
-      ]
-    }
-
-    return FamilyMember.find(query)
-      .populate('userId', 'fullName email')
-      .sort({ fullName: 1 })
-      .limit(50)
-  },
-
-  // Documents
-  async uploadDocument(documentData: any, userId: string) {
-    await connectDB()
-    
-    const document = new Document({
-      ...documentData,
-      uploadedBy: userId
-    })
-
-    return document.save()
-  },
-
-  async getUserDocuments(userId: string) {
-    await connectDB()
-    
-    return Document.find({ uploadedBy: userId })
-      .sort({ createdAt: -1 })
-      .lean()
-  },
-
-  async getFamilyMemberDocuments(familyMemberId: string) {
-    await connectDB()
-    
-    return Document.find({ familyMemberId })
-      .sort({ createdAt: -1 })
-      .lean()
-  },
+  // Documents - REMOVED (no document uploads in this system)
+  // uploadDocument, getUserDocuments, getFamilyMemberDocuments methods removed
 
   async getFamilyMemberById(memberId: string) {
     await connectDB()
-    
+
     // In node-based system, memberId is actually a nodeId
     const node = await FamilyTreeNode.findById(memberId)
       .populate('familyTreeId')
@@ -426,7 +298,7 @@ export const databaseService = {
   // Notifications
   async getNotifications(userId: string, unreadOnly = false) {
     await connectDB()
-    
+
     let query: any = { userId }
     if (unreadOnly) {
       query.read = false
@@ -437,63 +309,79 @@ export const databaseService = {
       .limit(50)
   },
 
-  async markNotificationAsRead(notificationId: string, userId: string) {
+  // Create a notification — centralized helper used throughout the app
+  async createNotification(data: {
+    userId: string
+    type: 'verification' | 'member_added' | 'system' | 'family_update'
+    title: string
+    message: string
+    priority?: 'low' | 'medium' | 'high'
+  }) {
     await connectDB()
-    
-    return Notification.findOneAndUpdate(
-      { _id: notificationId, userId },
-      { read: true, readAt: new Date() },
-      { new: true }
-    )
+    return new Notification({
+      userId: data.userId,
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      priority: data.priority || 'medium'
+    }).save()
   },
 
+  // Mark as read = delete from DB (keeps DB clean)
+  async markNotificationAsRead(notificationId: string, userId: string) {
+    await connectDB()
+    return Notification.findOneAndDelete({ _id: notificationId, userId })
+  },
+
+  // Mark all as read = delete all for this user (keeps DB clean)
   async markAllNotificationsAsRead(userId: string) {
     await connectDB()
-    
-    return Notification.updateMany(
-      { userId, read: false },
-      { read: true, readAt: new Date() }
-    )
+    return Notification.deleteMany({ userId })
   },
 
   // Admin functions
   async getPendingUsers() {
     await connectDB()
-    
+
     return User.find({ verificationStatus: 'pending' })
+      .select('-password')
+      .sort({ createdAt: -1 })
+  },
+
+  async getVerifiedUsers() {
+    await connectDB()
+
+    return User.find({ verificationStatus: 'verified' })
       .select('-password')
       .sort({ createdAt: -1 })
   },
 
   async getDashboardStats() {
     await connectDB()
-    
+
     const [
       totalUsers,
       totalFamilyTrees,
       totalMembers,
-      pendingVerifications,
-      totalDocuments
+      pendingVerifications
     ] = await Promise.all([
       User.countDocuments(),
       FamilyTree.countDocuments(),
-      FamilyMember.countDocuments(),
-      User.countDocuments({ verificationStatus: 'pending' }),
-      Document.countDocuments()
+      FamilyTreeNode.countDocuments(),
+      User.countDocuments({ verificationStatus: 'pending' })
     ])
 
     return {
       totalMembers: totalMembers,
       totalFamilies: totalFamilyTrees,
       pendingVerifications,
-      recentActivities: totalUsers, // Placeholder
-      documentsUploaded: totalDocuments
+      recentActivities: totalUsers // Placeholder
     }
   },
 
   async verifyUser(userId: string, adminId: string) {
     await connectDB()
-    
+
     const user = await User.findByIdAndUpdate(
       userId,
       {
@@ -508,21 +396,21 @@ export const databaseService = {
       throw new Error('User not found')
     }
 
-    // Create notification
-    await new Notification({
-      userId: user._id,
+    // Notify the user
+    await this.createNotification({
+      userId: user._id.toString(),
       type: 'verification',
-      title: 'Account Verified',
-      message: 'Your account has been verified by an administrator',
+      title: '✅ Account Verified',
+      message: 'Your account has been verified by an administrator. You now have full access.',
       priority: 'high'
-    }).save()
+    })
 
     return user
   },
 
   async rejectUser(userId: string, adminId: string) {
     await connectDB()
-    
+
     const user = await User.findByIdAndUpdate(
       userId,
       {
@@ -537,14 +425,14 @@ export const databaseService = {
       throw new Error('User not found')
     }
 
-    // Create notification
-    await new Notification({
-      userId: user._id,
+    // Notify the user
+    await this.createNotification({
+      userId: user._id.toString(),
       type: 'verification',
-      title: 'Account Verification Rejected',
-      message: 'Your account verification has been rejected. Please contact support for more information.',
+      title: '❌ Verification Rejected',
+      message: 'Your account verification has been rejected. Please contact the administrator for more information.',
       priority: 'high'
-    }).save()
+    })
 
     return user
   },
@@ -558,9 +446,9 @@ export const databaseService = {
   // Ensure all users with a family code have corresponding nodes
   async ensureNodesForFamily(familyCode: string) {
     await connectDB()
-    
+
     console.log(`[ensureNodesForFamily] Starting for family code: ${familyCode}`)
-    
+
     // Find all users with this family code
     const users = await User.find({ familyCode }).lean()
     console.log(`[ensureNodesForFamily] Found ${users.length} users with family code ${familyCode}`)
@@ -568,7 +456,7 @@ export const databaseService = {
       console.log(`[ensureNodesForFamily] No users found, returning`)
       return { success: true, created: 0, cleaned: 0, totalNodes: 0, totalUsers: 0 }
     }
-    
+
     // Find or create family tree
     let familyTree = await FamilyTree.findOne({ familyCode })
     if (!familyTree) {
@@ -603,7 +491,7 @@ export const databaseService = {
     // Clean up duplicate nodes (keep only one node per user)
     const userNodeMap = new Map()
     const duplicateNodes = []
-    
+
     for (const node of existingNodes) {
       const userId = node.userId?._id?.toString() || node.userId?.toString()
       if (!userId) {
@@ -612,7 +500,7 @@ export const databaseService = {
         console.log(`[ensureNodesForFamily] Found orphaned node: ${node._id}`)
         continue
       }
-      
+
       if (userNodeMap.has(userId)) {
         // Duplicate node - mark for deletion
         duplicateNodes.push(node._id)
@@ -626,7 +514,7 @@ export const databaseService = {
     let cleanedCount = 0
     if (duplicateNodes.length > 0) {
       console.log(`[ensureNodesForFamily] Cleaning up ${duplicateNodes.length} duplicate/orphaned nodes`)
-      
+
       // Delete all connections for these nodes
       const deletedConnections = await FamilyTreeConnection.deleteMany({
         $or: [
@@ -635,22 +523,22 @@ export const databaseService = {
         ]
       })
       console.log(`[ensureNodesForFamily] Deleted ${deletedConnections.deletedCount} connections for orphaned nodes`)
-      
+
       await FamilyTreeNode.deleteMany({ _id: { $in: duplicateNodes } })
       cleanedCount = duplicateNodes.length
     }
-    
+
     // Ensure each user has exactly one node
     let nodesCreated = 0
     for (let i = 0; i < users.length; i++) {
       const user = users[i]
-      console.log(`[ensureNodesForFamily] Checking node for user: ${user.fullName} (${user._id})`)
-      
-      if (!userNodeMap.has(user._id.toString())) {
+      console.log(`[ensureNodesForFamily] Checking node for user: ${user.fullName} (${(user as any)._id})`)
+
+      if (!userNodeMap.has((user as any)._id.toString())) {
         console.log(`[ensureNodesForFamily] Creating node for user: ${user.fullName}`)
         await new FamilyTreeNode({
           familyTreeId: familyTree._id,
-          userId: user._id,
+          userId: (user as any)._id,
           position: {
             x: (i % 5) * 250 + Math.random() * 50, // Add some randomness to prevent overlap
             y: Math.floor(i / 5) * 150 + Math.random() * 50
@@ -667,14 +555,14 @@ export const databaseService = {
         console.log(`[ensureNodesForFamily] Node already exists for user: ${user.fullName}`)
       }
     }
-    
+
     console.log(`[ensureNodesForFamily] Created ${nodesCreated} new nodes, cleaned ${cleanedCount} duplicates`)
-    
+
     // Update family member arrays
     await this.updateFamilyMemberArrays(familyCode)
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       created: nodesCreated,
       cleaned: cleanedCount,
       totalNodes: userNodeMap.size + nodesCreated,
@@ -684,7 +572,7 @@ export const databaseService = {
 
   async createFamilyTree(treeData: any, userId: string) {
     await connectDB()
-    
+
     const familyTree = new FamilyTree({
       ...treeData,
       createdBy: userId
@@ -695,7 +583,7 @@ export const databaseService = {
 
   async updateUserFamilyCode(userId: string, familyCode: string) {
     await connectDB()
-    
+
     return User.findByIdAndUpdate(
       userId,
       { familyCode },
@@ -723,10 +611,11 @@ export const databaseService = {
       return { success: true }
     }
 
-    // Find the user's node
-    const userNode = await FamilyTreeNode.findOne({ 
-      familyTreeId: familyTree._id, 
-      userId 
+    // REMOVED: FamilyMember.deleteMany - no longer needed
+    // 2. Find and remove the user's node
+    const userNode = await FamilyTreeNode.findOne({
+      familyTreeId: familyTree._id,
+      userId
     })
 
     if (userNode) {
@@ -743,22 +632,18 @@ export const databaseService = {
       // Remove the node
       await FamilyTreeNode.findByIdAndDelete(userNode._id)
 
-      // Update family tree member count
-      await FamilyTree.findByIdAndUpdate(familyTree._id, {
-        $inc: { memberCount: -1 }
-      })
+      // memberCount will be recalculated by updateFamilyMemberArrays (line 797)
 
-      // Check if family tree should be marked as inactive
+      // Check if family tree is now empty
       const remainingNodes = await FamilyTreeNode.countDocuments({
         familyTreeId: familyTree._id
       })
 
       if (remainingNodes === 0) {
-        await FamilyTree.findByIdAndUpdate(familyTree._id, {
-          isActive: false,
-          memberCount: 0,
-          rootUserId: null
-        })
+        // HARD DELETE: If no nodes left, delete the entire family tree
+        await FamilyTree.findByIdAndDelete(familyTree._id)
+        await FamilyMembersByFamily.deleteOne({ familyCode })
+        console.log(`[leaveFamily] Family tree ${familyTree._id} and arrays deleted as it became empty.`)
       } else if (wasRootMember) {
         // If root member left, assign root to the earliest remaining user
         const earliestNode = await FamilyTreeNode.findOne({
@@ -777,11 +662,80 @@ export const databaseService = {
     user.familyCode = undefined
     await user.save()
 
-    // Update family member arrays for the family they left
+    // Update family member arrays for the family they left (if it still exists)
     if (familyCode) {
-      await this.updateFamilyMemberArrays(familyCode)
+      const stillExists = await FamilyTree.exists({ _id: familyTree._id })
+      if (stillExists) {
+        await this.updateFamilyMemberArrays(familyCode)
+      }
     }
 
+    return { success: true }
+  },
+
+  // Transfer root member status to another family member
+  async transferRootMember(currentRootId: string, newRootId: string) {
+    await connectDB()
+
+    // 1. Verify current user is root
+    const currentRoot = await User.findById(currentRootId)
+    if (!currentRoot || !currentRoot.familyCode) throw new Error('Current user not found or not in a family')
+
+    const familyTree = await FamilyTree.findOne({ familyCode: currentRoot.familyCode })
+    if (!familyTree) throw new Error('Family tree not found')
+
+    if (familyTree.rootUserId.toString() !== currentRootId) {
+      throw new Error('Permission denied. You are not the root member of this family.')
+    }
+
+    // 2. Verify new root is in the same family
+    const newRoot = await User.findById(newRootId)
+    if (!newRoot) throw new Error('New root user not found')
+
+    if (newRoot.familyCode !== currentRoot.familyCode) {
+      throw new Error('Target user is not a member of your family')
+    }
+
+    // 3. Update FamilyTree rootUserId
+    await FamilyTree.findByIdAndUpdate(familyTree._id, {
+      rootUserId: newRootId
+    })
+
+    // 4. Update FamilyMembersByFamily
+    await this.updateFamilyMemberArrays(currentRoot.familyCode)
+
+    // 5. Send notifications
+    // To new root
+    await new Notification({
+      userId: newRootId,
+      type: 'family_update',
+      title: 'You are now the Root Member',
+      message: `You have been appointed as the Root Member of the "${familyTree.name}" family by ${currentRoot.fullName}. You now have full administrative control.`,
+      priority: 'high'
+    }).save()
+
+    // To old root
+    await new Notification({
+      userId: currentRootId,
+      type: 'family_update',
+      title: 'Root Status Transferred',
+      message: `You have successfully transferred root status to ${newRoot.fullName}. You are now a regular member.`,
+      priority: 'medium'
+    }).save()
+
+    // 6. Log activity
+    await new ActivityLog({
+      action: 'root_transfer',
+      performedBy: currentRootId,
+      targetUserId: newRootId,
+      familyCode: currentRoot.familyCode,
+      details: `Root status transferred from ${currentRoot.fullName} to ${newRoot.fullName}`,
+      tableName: 'FamilyTree',
+      recordId: familyTree._id,
+      timestamp: new Date()
+    }).save()
+
+    console.log(`[transferRootMember] Root transferred from ${currentRootId} to ${newRootId} for family ${currentRoot.familyCode}`)
     return { success: true }
   },
 
@@ -818,31 +772,20 @@ export const databaseService = {
     const tree = await FamilyTree.findOne({ familyCode })
     if (!tree) throw new Error('Family not found')
 
-    const query: any = { familyTreeId: tree._id }
-    if (status) query.verificationStatus = status
-
-    return FamilyMember.find(query)
+    // Get nodes instead of FamilyMembers
+    const nodes = await FamilyTreeNode.find({ familyTreeId: tree._id })
       .populate('userId', 'fullName email loginId phone')
       .sort({ createdAt: -1 })
+      .lean()
+
+    // Filter by status if provided
+    if (status) {
+      return nodes.filter((node: any) => node.userId?.verificationStatus === status)
+    }
+    return nodes
   },
 
-  async updateMemberStatus(memberId: string, status: 'pending' | 'verified' | 'rejected', adminId: string) {
-    await connectDB()
-
-    const member = await FamilyMember.findByIdAndUpdate(
-      memberId,
-      {
-        verificationStatus: status,
-        verifiedBy: adminId,
-        verifiedAt: new Date()
-      },
-      { new: true }
-    )
-
-    if (!member) throw new Error('Member not found')
-
-    return member
-  },
+  // REMOVED: updateMemberStatus - use verifyUser or rejectUser instead
 
   // Root member is ONLY set when creating a new family tree
   // Root member NEVER changes automatically - only manual admin intervention allowed
@@ -851,63 +794,139 @@ export const databaseService = {
   // Manual root member management (for admin use only)
   async setRootMember(familyTreeId: string, newRootUserId: string, adminId: string) {
     await connectDB()
-    
+
     // Verify admin permissions (you can add admin check here)
     // const admin = await User.findById(adminId)
     // if (!admin || admin.userType !== 'admin') {
     //   throw new Error('Only system admin can change root member')
     // }
-    
+
     const familyTree = await FamilyTree.findById(familyTreeId)
     if (!familyTree) throw new Error('Family tree not found')
-    
+
     const newRootUser = await User.findById(newRootUserId)
     if (!newRootUser) throw new Error('New root user not found')
-    
+
     // Verify the user is part of this family
     if (newRootUser.familyCode !== familyTree.familyCode) {
       throw new Error('User is not part of this family')
     }
-    
+
     // Update the root member
     await FamilyTree.findByIdAndUpdate(familyTreeId, {
       rootUserId: newRootUserId
     })
-    
+
     console.log(`Root member changed from ${familyTree.rootUserId} to ${newRootUserId} by admin ${adminId}`)
     return { success: true, message: 'Root member updated successfully' }
   },
 
   async addFamilyMemberWithRelationship(memberData: any, userId: string, targetMemberId?: string) {
     await connectDB()
-    
+
     const familyTree = await FamilyTree.findById(memberData.familyTreeId)
     if (!familyTree) throw new Error('Family tree not found')
 
     // If targetMemberId is provided, create smart relationship
     let relationshipToTarget = memberData.relationship
     if (targetMemberId) {
-      const targetMember = await FamilyMember.findById(targetMemberId)
-      if (targetMember) {
-        relationshipToTarget = `${this.capitalizeFirst(memberData.relationship)} of ${targetMember.fullName}`
+      // No need to find target member - relationships are now handled via connections
+    }
+
+    // 1. Generate Login ID
+    let loginId: string
+    let loginIdAttempts = 0
+    const maxLoginIdAttempts = 5
+
+    do {
+      loginId = await generateLoginId()
+      const existingLoginId = await User.findOne({ loginId })
+      if (!existingLoginId) {
+        break
+      }
+      loginIdAttempts++
+    } while (loginIdAttempts < maxLoginIdAttempts)
+
+    if (loginIdAttempts >= maxLoginIdAttempts) {
+      throw new Error('Unable to generate unique Login ID.')
+    }
+
+    // 2. Create Placeholder User
+    const newUser = new User({
+      fullName: memberData.fullName,
+      loginId: loginId,
+      userType: 'citizen',
+      familyCode: familyTree.familyCode,
+      verificationStatus: 'pending',
+      dateOfBirth: memberData.dateOfBirth,
+      placeOfBirth: memberData.placeOfBirth,
+      gender: memberData.gender,
+      nativePlace: memberData.nativePlace,
+      caste: memberData.caste,
+      aadhaarNumber: memberData.aadhaarNumber,
+      panNumber: memberData.panNumber,
+      isPlaceholder: true,
+      managedBy: userId,
+      occupation: memberData.occupation,
+      bio: memberData.bio,
+    })
+
+    const savedUser = await newUser.save()
+
+    // Create a node for this new member
+    // We need to find a position for the node. 
+    // For now, we'll place it near the target member if exists, or at a default position.
+    let position = { x: 0, y: 0 }
+
+    if (targetMemberId) {
+      // Try to find the target member's node to place this one nearby
+      // Note: targetMemberId passed here is likely a FamilyMember ID, but we need the Node.
+      // However, in the new system, we might be passing Node IDs? 
+      // Let's assume we place it at a default offset for now, and let the UI or layout engine handle it.
+      // Or better, ensureNodesForFamily will create the node if we don't do it here.
+      // But ensureNodesForFamily is usually called on load.
+
+      // Let's explicitly create a node to ensure immediate visibility
+      const nodeCount = await FamilyTreeNode.countDocuments({ familyTreeId: familyTree._id })
+      position = {
+        x: (nodeCount % 5) * 250,
+        y: Math.floor(nodeCount / 5) * 150
       }
     }
 
-    const member = new FamilyMember({
-      ...memberData,
-      relationshipToTarget,
-      targetMemberId,
-      isRootMember: false,
-      joinedAt: new Date(),
-      createdBy: userId
-    })
+    await new FamilyTreeNode({
+      familyTreeId: familyTree._id,
+      userId: savedUser._id,
+      position,
+      nodeData: {
+        width: 200,
+        height: 100,
+        color: COLORS.FAMILY_TREE.REGULAR_MEMBER,
+        isVisible: true
+      }
+    }).save()
 
-    const savedMember = await member.save()
-    
-    // Update family tree member count
-    await FamilyTree.findByIdAndUpdate(memberData.familyTreeId, {
-      $inc: { memberCount: 1 }
-    })
+    // Recalculate member count from actual data
+    await this.updateFamilyMemberArrays(familyTree.familyCode)
+
+    // Add references if provided (same as signup)
+    if (memberData.reference1Name && memberData.reference1Mobile) {
+      await new UserReference({
+        userId: savedUser._id,
+        referenceName: memberData.reference1Name,
+        referencePhone: memberData.reference1Mobile,
+        referenceType: 1
+      }).save()
+    }
+
+    if (memberData.reference2Name && memberData.reference2Mobile) {
+      await new UserReference({
+        userId: savedUser._id,
+        referenceName: memberData.reference2Name,
+        referencePhone: memberData.reference2Mobile,
+        referenceType: 2
+      }).save()
+    }
 
     // Create notification for family tree owner
     if (familyTree.createdBy.toString() !== userId) {
@@ -920,12 +939,12 @@ export const databaseService = {
       }).save()
     }
 
-    return savedMember
+    return { success: true, user: savedUser }
   },
 
   async removeFamilyMember(memberId: string, userId: string) {
     await connectDB()
-    
+
     // In node-based system, memberId is actually a nodeId
     const node = await FamilyTreeNode.findById(memberId).populate('userId')
     if (!node) throw new Error('Family member not found')
@@ -942,7 +961,12 @@ export const databaseService = {
       throw new Error('Permission denied. Only root members, family creators, or system admins can remove members.')
     }
 
-    // Remove all connections involving this node
+    const nodeUserId = (node.userId as any)._id || node.userId
+    const familyCode = familyTree.familyCode
+
+    // REMOVED: FamilyMember.deleteMany - no longer needed
+
+    // 2. Remove all connections involving this node
     await FamilyTreeConnection.deleteMany({
       $or: [
         { sourceNodeId: node._id },
@@ -950,25 +974,27 @@ export const databaseService = {
       ]
     })
 
-    // Remove the node
+    // 3. Remove the node
     await FamilyTreeNode.findByIdAndDelete(memberId)
 
-    // Update family tree member count
-    await FamilyTree.findByIdAndUpdate(familyTree._id, {
-      $inc: { memberCount: -1 }
+    // 4. Unset User.familyCode (remove from family but keep user account)
+    await User.findByIdAndUpdate(nodeUserId, {
+      $unset: { familyCode: "" }
     })
 
-    // If no nodes left, mark family tree as inactive
+    // 5. Check if family becomes empty
     const remainingNodes = await FamilyTreeNode.countDocuments({
       familyTreeId: familyTree._id
     })
 
     if (remainingNodes === 0) {
-      await FamilyTree.findByIdAndUpdate(familyTree._id, {
-        isActive: false,
-        memberCount: 0,
-        rootUserId: null
-      })
+      // Delete family tree and related data
+      await FamilyTree.findByIdAndDelete(familyTree._id)
+      await FamilyMembersByFamily.deleteOne({ familyCode })
+      console.log(`[removeFamilyMember] Family tree ${familyTree._id} deleted as it became empty.`)
+    } else {
+      // 6. Update family member arrays
+      await this.updateFamilyMemberArrays(familyCode)
     }
 
     return { success: true }
@@ -976,10 +1002,10 @@ export const databaseService = {
 
   async getFamilyMembersWithSmartRelationships(familyTreeId: string) {
     await connectDB()
-    
+
     // Get nodes instead of FamilyMembers
     const nodes = await FamilyTreeNode.find({ familyTreeId })
-      .populate('userId', 'fullName email loginId phone dateOfBirth gender placeOfBirth verificationStatus')
+      .populate('userId', 'fullName email loginId phone dateOfBirth gender placeOfBirth verificationStatus occupation bio fatherName motherName spouseName isPlaceholder managedBy')
       .sort({ createdAt: 1 })
       .lean()
 
@@ -1010,7 +1036,7 @@ export const databaseService = {
 
   async getFamilyMembersForSelection(familyTreeId: string) {
     await connectDB()
-    
+
     // Get nodes instead of FamilyMembers
     const nodes = await FamilyTreeNode.find({ familyTreeId })
       .populate('userId', 'fullName verificationStatus')
@@ -1040,44 +1066,21 @@ export const databaseService = {
 
   async updateUserDataInFamilyMembers(userId: string, updateData: any) {
     await connectDB()
-    
-    // Update all family members linked to this user
-    const updateFields: any = {}
-    
-    if (updateData.fullName) updateFields.fullName = updateData.fullName
-    if (updateData.phone) updateFields.phone = updateData.phone
-    if (updateData.email) updateFields.email = updateData.email
 
-    if (Object.keys(updateFields).length > 0) {
-      await FamilyMember.updateMany(
-        { userId },
-        { $set: updateFields }
-      )
-    }
+    // Deprecated: FamilyMember is now a link table. User data is stored in User model.
+    // We don't need to sync data to FamilyMember anymore.
+    return { success: true }
 
     return { success: true }
-  },
-
-  async isUserRootMember(userId: string, familyTreeId: string): Promise<boolean> {
-    await connectDB()
-    
-    const member = await FamilyMember.findOne({
-      userId,
-      familyTreeId,
-      isRootMember: true,
-      verificationStatus: { $ne: 'rejected' }
-    })
-    
-    return !!member
   },
 
   // Node-based Family Tree Methods
   async getFamilyTreeNodes(familyTreeId: string) {
     await connectDB()
-    
+
     console.log(`[getFamilyTreeNodes] Fetching nodes for family tree ID: ${familyTreeId}`)
     const nodes = await FamilyTreeNode.find({ familyTreeId })
-      .populate('userId', 'fullName email loginId phone avatarUrl dateOfBirth gender verificationStatus')
+      .populate('userId', 'fullName email loginId phone dateOfBirth gender placeOfBirth verificationStatus occupation bio fatherName motherName spouseName isPlaceholder managedBy')
       .lean()
     console.log(`[getFamilyTreeNodes] Found ${nodes.length} nodes`)
     return nodes
@@ -1085,7 +1088,7 @@ export const databaseService = {
 
   async getFamilyTreeConnections(familyTreeId: string) {
     await connectDB()
-    
+
     return FamilyTreeConnection.find({ familyTreeId })
       .populate('sourceNodeId', '_id userId position nodeData')
       .populate('targetNodeId', '_id userId position nodeData')
@@ -1094,16 +1097,16 @@ export const databaseService = {
 
   async updateNodePosition(nodeId: string, position: { x: number; y: number }, userId: string) {
     await connectDB()
-    
+
     const node = await FamilyTreeNode.findById(nodeId).populate('familyTreeId')
     if (!node) throw new Error('Node not found')
-    
+
     // Check if user is root member
     const familyTree = node.familyTreeId as any
     if (familyTree.rootUserId.toString() !== userId) {
       throw new Error('Only root member can move nodes')
     }
-    
+
     return FamilyTreeNode.findByIdAndUpdate(
       nodeId,
       { position },
@@ -1121,18 +1124,18 @@ export const databaseService = {
     relationshipLabel: string
   }, userId: string) {
     await connectDB()
-    
+
     console.log('Database createConnection called with:', {
       ...connectionData,
       userId
     })
-    
+
     // Check if user is root member
     const familyTree = await FamilyTree.findById(connectionData.familyTreeId)
     if (!familyTree || familyTree.rootUserId.toString() !== userId) {
       throw new Error('Only root member can create connections')
     }
-    
+
     // Allow multiple connections between nodes with different relationship types/labels
     // This supports all cardinalities: 1:1, 1:M, M:1, M:M, and 0 (no connections)
     // Only prevent exact duplicate relationships (same type AND label between same nodes in same direction)
@@ -1143,45 +1146,45 @@ export const databaseService = {
       relationshipType: connectionData.relationshipType,
       relationshipLabel: connectionData.relationshipLabel
     })
-    
+
     if (duplicateConnection) {
       throw new Error(`"${connectionData.relationshipLabel}" relationship already exists between these nodes`)
     }
-    
+
     const connection = new FamilyTreeConnection({
       ...connectionData,
       createdBy: userId
     })
-    
+
     return connection.save()
   },
 
   async updateConnection(connectionId: string, updateData: { relationshipType: string, relationshipLabel: string }, userId: string) {
     await connectDB()
-    
+
     try {
       const connection = await FamilyTreeConnection.findById(connectionId).populate('familyTreeId')
       if (!connection) throw new Error('Connection not found')
-      
+
       // Check if user is root member
       const familyTree = connection.familyTreeId as any
       if (!familyTree) throw new Error('Family tree not found')
-      
+
       if (familyTree.rootUserId.toString() !== userId) {
         throw new Error('Only root member can update connections')
       }
-      
+
       // Validate relationship type
       const validTypes = [
-        'parent-child', 'spouse', 'sibling', 'grandparent-grandchild', 
-        'uncle-nephew', 'cousin', 'in-law', 'step-family', 'adopted', 
+        'parent-child', 'spouse', 'sibling', 'grandparent-grandchild',
+        'uncle-nephew', 'cousin', 'in-law', 'step-family', 'adopted',
         'guardian-ward', 'friend', 'business', 'other'
       ]
-      
+
       if (!validTypes.includes(updateData.relationshipType)) {
         throw new Error(`Invalid relationship type: ${updateData.relationshipType}`)
       }
-      
+
       return await FamilyTreeConnection.findByIdAndUpdate(
         connectionId,
         {
@@ -1198,32 +1201,32 @@ export const databaseService = {
 
   async deleteConnection(connectionId: string, userId: string) {
     await connectDB()
-    
+
     const connection = await FamilyTreeConnection.findById(connectionId).populate('familyTreeId')
     if (!connection) throw new Error('Connection not found')
-    
+
     // Check if user is root member
     const familyTree = connection.familyTreeId as any
     if (familyTree.rootUserId.toString() !== userId) {
       throw new Error('Only root member can delete connections')
     }
-    
+
     return FamilyTreeConnection.findByIdAndDelete(connectionId)
   },
 
   async deleteNodeWithConnections(nodeId: string, userId: string) {
     await connectDB()
-    
+
     try {
       // Get the node to verify permissions
       const node = await FamilyTreeNode.findById(nodeId).populate('familyTreeId')
       if (!node) throw new Error('Node not found')
-      
+
       const familyTree = (node as any).familyTreeId
       if (familyTree.rootUserId.toString() !== userId) {
         throw new Error('Only root member can delete nodes')
       }
-      
+
       // Delete all connections involving this node
       const deletedConnections = await FamilyTreeConnection.deleteMany({
         $or: [
@@ -1231,12 +1234,12 @@ export const databaseService = {
           { targetNodeId: nodeId }
         ]
       })
-      
+
       // Delete the node itself
       await FamilyTreeNode.findByIdAndDelete(nodeId)
-      
+
       console.log(`Deleted node ${nodeId} and ${deletedConnections.deletedCount} associated connections`)
-      
+
       return {
         success: true,
         deletedConnections: deletedConnections.deletedCount
@@ -1249,35 +1252,35 @@ export const databaseService = {
 
   async saveFamilyTreeLayout(familyTreeId: string, nodes: any[], connections: any[], userId: string) {
     await connectDB()
-    
+
     // Check if user is root member
     const familyTree = await FamilyTree.findById(familyTreeId)
     if (!familyTree || familyTree.rootUserId.toString() !== userId) {
       throw new Error('Only root member can save tree layout')
     }
-    
+
     // UNLIMITED EDITING: Root member can save layout as many times as needed
     // No restrictions on number of saves or edits
     // Update node positions and data
-    const nodeUpdates = nodes.map(node => 
+    const nodeUpdates = nodes.map(node =>
       FamilyTreeNode.findByIdAndUpdate(
         node.id,
-        { 
+        {
           position: node.position,
           nodeData: node.data
         }
       )
     )
-    
+
     await Promise.all(nodeUpdates)
-    
+
     // Note: Connections are managed separately through createConnection/deleteConnection
     return { success: true }
   },
 
   async isUserRootOfFamily(userId: string, familyTreeId: string): Promise<boolean> {
     await connectDB()
-    
+
     const familyTree = await FamilyTree.findById(familyTreeId)
     return familyTree?.rootUserId.toString() === userId
   },
@@ -1290,7 +1293,7 @@ export const databaseService = {
   // Methods to maintain family member arrays
   async updateFamilyMemberArrays(familyCode: string) {
     await connectDB()
-    
+
     try {
       // Get family tree
       const familyTree = await FamilyTree.findOne({ familyCode }).lean() as any
@@ -1298,44 +1301,13 @@ export const databaseService = {
 
       // Get all users in this family
       const users = await User.find({ familyCode }).lean()
-      
+
       // Get all nodes for position data
       const nodes = await FamilyTreeNode.find({ familyTreeId: familyTree._id })
         .populate('userId', 'fullName email loginId phone dateOfBirth gender placeOfBirth verificationStatus')
         .lean()
 
-      // Create member arrays
-      const memberBasicInfo = users.map((user: any) => {
-        const node = nodes.find((n: any) => (n as any).userId._id.toString() === user._id.toString())
-        return {
-          userId: user._id,
-          fullName: user.fullName,
-          loginId: user.loginId,
-          email: user.email,
-          gender: user.gender,
-          dateOfBirth: user.dateOfBirth,
-          verificationStatus: user.verificationStatus || 'pending',
-          isRoot: familyTree.rootUserId.toString() === user._id.toString(),
-          joinedAt: user.createdAt
-        }
-      })
 
-      const memberDetails = users.map((user: any) => {
-        const node = nodes.find((n: any) => (n as any).userId._id.toString() === user._id.toString())
-        return {
-          userId: user._id,
-          fullName: user.fullName,
-          loginId: user.loginId,
-          email: user.email,
-          gender: user.gender,
-          dateOfBirth: user.dateOfBirth,
-          placeOfBirth: user.placeOfBirth,
-          verificationStatus: user.verificationStatus || 'pending',
-          isRoot: familyTree.rootUserId.toString() === user._id.toString(),
-          joinedAt: user.createdAt,
-          nodePosition: node?.position || { x: 0, y: 0 }
-        }
-      })
 
       // Calculate statistics
       const stats = {
@@ -1347,9 +1319,8 @@ export const databaseService = {
         otherMembers: users.filter((u: any) => u.gender === 'other').length
       }
 
-      // Update FamilyTree with members array
+      // Update FamilyTree member count
       await FamilyTree.findByIdAndUpdate(familyTree._id, {
-        members: memberBasicInfo,
         memberCount: users.length
       })
 
@@ -1362,7 +1333,6 @@ export const databaseService = {
           familyName: familyTree.name,
           rootUserId: familyTree.rootUserId,
           memberUserIds: users.map((u: any) => u._id),
-          memberDetails,
           stats,
           lastUpdated: new Date()
         },
@@ -1378,20 +1348,310 @@ export const databaseService = {
 
   async getFamilyMemberArrays(familyCode: string) {
     await connectDB()
-    
+
     const familyMembersDoc = await FamilyMembersByFamily.findOne({ familyCode })
       .populate('memberUserIds', 'fullName email loginId verificationStatus')
       .lean()
-    
+
     return familyMembersDoc
+  },
+
+  // ============================================================================
+  // DATA VALIDATION & INTEGRITY
+  // ============================================================================
+
+  /**
+   * Validate and fix data integrity issues for families
+   * This function is designed to be run manually by admins
+   * @param familyCode - Optional family code to validate specific family, or undefined for all families
+   * @returns Object with issues found and fixes applied
+   */
+  async validateAndFixFamilyData(familyCode?: string) {
+    await connectDB()
+
+    const issues: any[] = []
+    const fixes: string[] = []
+
+    // Get families to validate
+    const families = familyCode
+      ? [await FamilyTree.findOne({ familyCode })]
+      : await FamilyTree.find({})
+
+    console.log(`[VALIDATION] Starting validation for ${families.length} families...`)
+
+    for (const family of families) {
+      if (!family) continue
+
+      console.log(`[VALIDATION] Checking family ${family.familyCode}...`)
+
+      // 1. Check memberCount accuracy
+      const actualUserCount = await User.countDocuments({ familyCode: family.familyCode })
+      if (family.memberCount !== actualUserCount) {
+        issues.push({
+          family: family.familyCode,
+          issue: 'memberCount mismatch',
+          expected: actualUserCount,
+          actual: family.memberCount,
+          severity: 'high'
+        })
+
+        // Fix it
+        await this.updateFamilyMemberArrays(family.familyCode)
+        fixes.push(`Fixed memberCount for ${family.familyCode} (was ${family.memberCount}, now ${actualUserCount})`)
+      }
+
+      // 2. Check for orphaned nodes (nodes without users)
+      const nodes = await FamilyTreeNode.find({ familyTreeId: family._id })
+      for (const node of nodes) {
+        const userExists = await User.exists({ _id: node.userId })
+        if (!userExists) {
+          issues.push({
+            family: family.familyCode,
+            issue: 'orphaned node',
+            nodeId: node._id.toString(),
+            userId: node.userId.toString(),
+            severity: 'high'
+          })
+
+          // Fix it - delete orphaned node
+          await FamilyTreeNode.findByIdAndDelete(node._id)
+          // Delete connections involving this node
+          await FamilyTreeConnection.deleteMany({
+            $or: [
+              { sourceNodeId: node._id },
+              { targetNodeId: node._id }
+            ]
+          })
+          fixes.push(`Deleted orphaned node ${node._id} for non-existent user ${node.userId}`)
+        }
+      }
+
+      // 3. Check for duplicate nodes (same user, same family)
+      const nodeUserIds = nodes.map(n => n.userId.toString())
+      const duplicateUserIds = nodeUserIds.filter((id, index) => nodeUserIds.indexOf(id) !== index)
+      const uniqueDuplicates = [...new Set(duplicateUserIds)]
+
+      if (uniqueDuplicates.length > 0) {
+        issues.push({
+          family: family.familyCode,
+          issue: 'duplicate nodes',
+          userIds: uniqueDuplicates,
+          severity: 'medium'
+        })
+
+        // Fix it - keep first, delete rest
+        for (const userId of uniqueDuplicates) {
+          const dupeNodes = await FamilyTreeNode.find({
+            familyTreeId: family._id,
+            userId
+          }).sort({ createdAt: 1 })
+
+          for (let i = 1; i < dupeNodes.length; i++) {
+            await FamilyTreeNode.findByIdAndDelete(dupeNodes[i]._id)
+            fixes.push(`Deleted duplicate node ${dupeNodes[i]._id} for user ${userId}`)
+          }
+        }
+      }
+
+      // 4. Check for users with familyCode but no node
+      const users = await User.find({ familyCode: family.familyCode })
+      for (const user of users) {
+        const nodeExists = await FamilyTreeNode.exists({
+          familyTreeId: family._id,
+          userId: user._id
+        })
+
+        if (!nodeExists) {
+          issues.push({
+            family: family.familyCode,
+            issue: 'missing node',
+            userId: user._id.toString(),
+            userName: user.fullName,
+            severity: 'high'
+          })
+
+          // Fix it - create node
+          await new FamilyTreeNode({
+            familyTreeId: family._id,
+            userId: user._id,
+            position: { x: 0, y: 0 },
+            nodeData: {
+              width: 200,
+              height: 100,
+              color: '#ffffff',
+              isVisible: true
+            }
+          }).save()
+          fixes.push(`Created missing node for user ${user.fullName} (${user._id})`)
+        }
+      }
+
+      // 5. Check for orphaned FamilyMembersByFamily
+      const arrayDoc = await FamilyMembersByFamily.findOne({ familyCode: family.familyCode })
+      if (arrayDoc) {
+        const familyExists = await FamilyTree.exists({ familyCode: family.familyCode })
+        if (!familyExists) {
+          issues.push({
+            family: family.familyCode,
+            issue: 'orphaned FamilyMembersByFamily',
+            severity: 'medium'
+          })
+
+          // Fix it
+          await FamilyMembersByFamily.deleteOne({ familyCode: family.familyCode })
+          fixes.push(`Deleted orphaned FamilyMembersByFamily for ${family.familyCode}`)
+        }
+      }
+
+      // 6. Check root member validity
+      if (family.rootUserId) {
+        const rootExists = await User.exists({ _id: family.rootUserId })
+        if (!rootExists) {
+          issues.push({
+            family: family.familyCode,
+            issue: 'invalid root member',
+            rootUserId: family.rootUserId.toString(),
+            severity: 'critical'
+          })
+
+          // Fix it - assign to earliest member
+          const earliestNode = await FamilyTreeNode.findOne({
+            familyTreeId: family._id
+          }).populate('userId').sort({ createdAt: 1 })
+
+          if (earliestNode) {
+            await FamilyTree.findByIdAndUpdate(family._id, {
+              rootUserId: earliestNode.userId
+            })
+            const newRoot = earliestNode.userId as any
+            fixes.push(`Reassigned root member for ${family.familyCode} to ${newRoot.fullName}`)
+          } else {
+            // No members left - delete family
+            await FamilyTree.findByIdAndDelete(family._id)
+            await FamilyMembersByFamily.deleteOne({ familyCode: family.familyCode })
+            fixes.push(`Deleted empty family ${family.familyCode} with invalid root`)
+          }
+        }
+      }
+
+      // 7. Check for broken connections (connections pointing to non-existent nodes)
+      const connections = await FamilyTreeConnection.find({ familyTreeId: family._id })
+      for (const conn of connections) {
+        const sourceExists = await FamilyTreeNode.exists({ _id: conn.sourceNodeId })
+        const targetExists = await FamilyTreeNode.exists({ _id: conn.targetNodeId })
+
+        if (!sourceExists || !targetExists) {
+          issues.push({
+            family: family.familyCode,
+            issue: 'broken connection',
+            connectionId: conn._id.toString(),
+            sourceExists,
+            targetExists,
+            severity: 'medium'
+          })
+
+          // Fix it - delete broken connection
+          await FamilyTreeConnection.findByIdAndDelete(conn._id)
+          fixes.push(`Deleted broken connection ${conn._id}`)
+        }
+      }
+    }
+
+    // Log summary
+    console.log(`[VALIDATION] Validation complete!`)
+    console.log(`[VALIDATION] Issues found: ${issues.length}`)
+    console.log(`[VALIDATION] Fixes applied: ${fixes.length}`)
+
+    return {
+      success: true,
+      issuesFound: issues.length,
+      issuesFixed: fixes.length,
+      issues,
+      fixes,
+      summary: {
+        familiesChecked: families.filter(f => f !== null).length,
+        criticalIssues: issues.filter(i => i.severity === 'critical').length,
+        highIssues: issues.filter(i => i.severity === 'high').length,
+        mediumIssues: issues.filter(i => i.severity === 'medium').length
+      }
+    }
   },
 
   async getAllFamiliesWithMembers() {
     await connectDB()
-    
+
     return FamilyMembersByFamily.find({})
       .populate('rootUserId', 'fullName email loginId')
       .sort({ 'stats.totalMembers': -1 })
       .lean()
+  },
+
+  // Update family member details (for root member edit functionality)
+  async updateFamilyMemberDetails(userId: string, updateData: any) {
+    await connectDB()
+
+    // Define allowed fields for update
+    const allowedFields = [
+      'fullName', 'dateOfBirth', 'placeOfBirth', 'gender',
+      'nativePlace', 'caste', 'occupation', 'bio',
+      'fatherName', 'motherName', 'grandfatherName', 'spouseName',
+      'aadhaarNumber', 'panNumber'
+    ]
+
+    // Enum fields that cannot be empty strings (Mongoose validation would fail)
+    const enumFields = ['gender']
+
+    const setData: any = {}
+    const unsetData: any = {}
+
+    allowedFields.forEach(field => {
+      const value = updateData[field]
+      if (value === undefined) return // not included in request — skip
+
+      if (value === '' || value === null) {
+        // Empty/null: unset the field rather than storing invalid empty string
+        unsetData[field] = ''
+      } else if (enumFields.includes(field)) {
+        // Enum field with a real value — set it
+        setData[field] = value
+      } else {
+        setData[field] = value
+      }
+    })
+
+    // Convert dateOfBirth to Date if provided
+    if (setData.dateOfBirth) {
+      setData.dateOfBirth = new Date(setData.dateOfBirth)
+    }
+
+    // Build the update operation
+    const updateOp: any = {}
+    if (Object.keys(setData).length > 0) updateOp.$set = setData
+    if (Object.keys(unsetData).length > 0) updateOp.$unset = unsetData
+
+    if (Object.keys(updateOp).length === 0) {
+      // Nothing to update — just return current user
+      const currentUser = await User.findById(userId).select('-password')
+      if (!currentUser) throw new Error('User not found')
+      return currentUser
+    }
+
+    // Update user (no runValidators on $unset to avoid enum errors on cleared fields)
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateOp,
+      { new: true, runValidators: false }
+    ).select('-password')
+
+    if (!updatedUser) {
+      throw new Error('User not found')
+    }
+
+    // Update family member arrays to reflect changes
+    if (updatedUser.familyCode) {
+      await this.updateFamilyMemberArrays(updatedUser.familyCode)
+    }
+
+    return updatedUser
   }
 }

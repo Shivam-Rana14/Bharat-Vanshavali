@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Use new smart relationship method
     const members = await databaseService.getFamilyMembersWithSmartRelationships(familyTree._id.toString())
-    
+
     // Transform members data to match frontend expectations
     const transformedMembers = members.map((member: any) => ({
       _id: member._id,
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       createdAt: member.createdAt,
       updatedAt: member.updatedAt
     }))
-    
+
     return NextResponse.json({ success: true, members: transformedMembers })
   } catch (error) {
     console.error('Error fetching family members:', error)
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     const user = requireAuth(request)
 
     const { memberData, targetMemberId } = await request.json()
-    
+
     // Get user's family code and find family tree
     const userProfile = await databaseService.getUserById(user.id)
     if (!userProfile?.familyCode) {
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check permissions - only root members, family creators, or admins can add members
-    const isRootMember = await databaseService.isUserRootMember(user.id, familyTree._id.toString())
+    const isRootMember = await databaseService.isUserRootOfFamily(user.id, familyTree._id.toString())
     const isFamilyCreator = familyTree.createdBy.toString() === user.id
     const isSystemAdmin = user.type === 'admin'
 
@@ -113,6 +113,15 @@ export async function POST(request: NextRequest) {
       user.id,
       targetMemberId
     )
+
+    // Notify the adding user (root/creator) as confirmation
+    databaseService.createNotification({
+      userId: user.id,
+      type: 'member_added',
+      title: '👤 Member Added',
+      message: `New family member "${memberData.fullName || 'Unknown'}" has been added to your family tree.`,
+      priority: 'medium'
+    }).catch(() => {})
 
     return NextResponse.json({ success: true, data: newMember })
   } catch (error) {

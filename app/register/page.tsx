@@ -1,22 +1,21 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { usePersistentState } from "@/hooks/usePersistentState"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
-import { TreePine, Upload, Camera, MapPin, Shield, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { TreePine, Shield, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import Link from "next/link"
 import { Navbar } from "@/components/layout/navbar"
 import { validateRegistrationForm, formatPhoneNumber, cleanPhoneNumber } from "@/lib/validation"
 import { useFormPersistence, useNetworkStatus } from "@/lib/form-persistence"
 import { useToast } from "@/hooks/use-toast"
 import { useLoading } from "@/components/providers/loading-provider"
+import { LocationInput } from "@/components/ui/location-input"
 
 interface FormData {
   // Personal Details
@@ -28,7 +27,7 @@ interface FormData {
   email: string
   password: string
   confirmPassword: string
-  
+
   // Additional Details
   nativePlace: string
   caste: string
@@ -36,30 +35,21 @@ interface FormData {
   reference1Mobile: string
   reference2Name: string
   reference2Mobile: string
-  
+
   // Family Details
   familyCode: string
   relationship: string
-  
+
   // Documents
-  aadhaarFile: File | null
-  voterIdFile: File | null
-  birthCertFile: File | null
-  
+  aadhaarNumber: string
+  panNumber: string
+
   // Verification
-  selfieFile: File | null
-  latitude?: number | null
-  longitude?: number | null
-  locationConsent: boolean
   termsAccepted: boolean
 }
 
 export default function RegisterPage() {
   const [currentStep, setCurrentStep] = useState(1)
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const [cameraActive, setCameraActive] = useState(false)
-  const [selfiePreview, setSelfiePreview] = useState<string | null>(null)
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -68,12 +58,13 @@ export default function RegisterPage() {
     show: boolean
     familyCode?: string
     userName?: string
+    loginId?: string
   }>({ show: false })
   const { toast } = useToast()
   const { showLoading, hideLoading } = useLoading()
   const { isOnline } = useNetworkStatus()
-  const formPersistence = useFormPersistence('registration')
-  const [formData, setFormData, clearForm] = usePersistentState<FormData>('registerForm', {
+
+  const [formData, setFormData] = useState<FormData>({
     // Personal Details
     fullName: "",
     dateOfBirth: "",
@@ -83,7 +74,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    
+
     // Additional Details
     nativePlace: "",
     caste: "",
@@ -91,31 +82,108 @@ export default function RegisterPage() {
     reference1Mobile: "",
     reference2Name: "",
     reference2Mobile: "",
-    
+
     // Family Details
     familyCode: "",
     relationship: "",
-    
+
     // Documents
-    aadhaarFile: null,
-    voterIdFile: null,
-    birthCertFile: null,
-    
+    aadhaarNumber: "",
+    panNumber: "",
+
     // Verification
-    selfieFile: null,
-    latitude: null,
-    longitude: null,
-    locationConsent: false,
     termsAccepted: false
   })
 
   const totalSteps = 4
   const [showRelationship, setShowRelationship] = useState(false)
 
+  // Check email uniqueness
+  const checkEmailUniqueness = async () => {
+    if (!formData.email) return
+
+    try {
+      const res = await fetch('/api/auth/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'email', value: formData.email })
+      })
+      const data = await res.json()
+      if (data.success && data.exists) {
+        setErrors(prev => ({ ...prev, email: 'Email already registered' }))
+      } else if (data.success && !data.exists) {
+        // Clear error if it was "Email already registered"
+        setErrors(prev => {
+          const newErrors = { ...prev }
+          if (newErrors.email === 'Email already registered') {
+            delete newErrors.email
+          }
+          return newErrors
+        })
+      }
+    } catch (error) {
+      console.error('Email validation error:', error)
+    }
+  }
+
+  // Check Aadhaar uniqueness
+  const checkAadhaarUniqueness = async () => {
+    if (!formData.aadhaarNumber || formData.aadhaarNumber.length !== 12) return
+
+    try {
+      const res = await fetch('/api/auth/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'aadhaarNumber', value: formData.aadhaarNumber })
+      })
+      const data = await res.json()
+      if (data.success && data.exists) {
+        setErrors(prev => ({ ...prev, aadhaarNumber: 'Aadhaar number already registered' }))
+      } else if (data.success && !data.exists) {
+        setErrors(prev => {
+          const newErrors = { ...prev }
+          if (newErrors.aadhaarNumber === 'Aadhaar number already registered') {
+            delete newErrors.aadhaarNumber
+          }
+          return newErrors
+        })
+      }
+    } catch (error) {
+      console.error('Aadhaar validation error:', error)
+    }
+  }
+
+  // Check PAN uniqueness
+  const checkPanUniqueness = async () => {
+    if (!formData.panNumber || formData.panNumber.length !== 10) return
+
+    try {
+      const res = await fetch('/api/auth/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'panNumber', value: formData.panNumber })
+      })
+      const data = await res.json()
+      if (data.success && data.exists) {
+        setErrors(prev => ({ ...prev, panNumber: 'PAN number already registered' }))
+      } else if (data.success && !data.exists) {
+        setErrors(prev => {
+          const newErrors = { ...prev }
+          if (newErrors.panNumber === 'PAN number already registered') {
+            delete newErrors.panNumber
+          }
+          return newErrors
+        })
+      }
+    } catch (error) {
+      console.error('PAN validation error:', error)
+    }
+  }
+
   // Validate current step
   const validateCurrentStep = (): boolean => {
     const newErrors: { [key: string]: string } = {}
-    
+
     if (currentStep === 1) {
       // Personal details validation
       const validation = validateRegistrationForm({
@@ -130,7 +198,7 @@ export default function RegisterPage() {
         reference2Name: formData.reference2Name,
         reference2Phone: formData.reference2Mobile
       })
-      
+
       // Only check required fields for step 1
       const requiredFields = ['fullName', 'email', 'password', 'confirmPassword', 'phone']
       validation.errors.forEach(error => {
@@ -140,25 +208,56 @@ export default function RegisterPage() {
           newErrors[fieldName] = error.message
         }
       })
+    } else if (currentStep === 2) {
+      // Step 2 validation (Family & References)
+      if (!formData.reference1Name.trim()) {
+        newErrors.reference1Name = 'Reference 1 Name is required'
+      }
+      if (!formData.reference1Mobile) {
+        newErrors.reference1Mobile = 'Reference 1 Mobile is required'
+      } else if (!/^[6-9]\d{9}$/.test(formData.reference1Mobile)) {
+        newErrors.reference1Mobile = 'Invalid mobile number'
+      }
+
+      if (!formData.reference2Name.trim()) {
+        newErrors.reference2Name = 'Reference 2 Name is required'
+      }
+      if (!formData.reference2Mobile) {
+        newErrors.reference2Mobile = 'Reference 2 Mobile is required'
+      } else if (!/^[6-9]\d{9}$/.test(formData.reference2Mobile)) {
+        newErrors.reference2Mobile = 'Invalid mobile number'
+      }
+    } else if (currentStep === 3) {
+      // Document validation
+      if (!formData.aadhaarNumber) {
+        newErrors.aadhaarNumber = 'Aadhaar number is required'
+      } else if (!/^\d{12}$/.test(formData.aadhaarNumber)) {
+        newErrors.aadhaarNumber = 'Aadhaar number must be 12 digits'
+      }
+
+      if (!formData.panNumber) {
+        newErrors.panNumber = 'PAN number is required'
+      } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber)) {
+        newErrors.panNumber = 'Invalid PAN number format (e.g. ABCDE1234F)'
+      }
     } else if (currentStep === 4) {
       // Final step - check terms
       if (!formData.termsAccepted) {
         newErrors.termsAccepted = 'You must accept the terms and conditions'
       }
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleNext = () => {
     const isValid = validateCurrentStep()
-    
+
     if (isValid && currentStep < totalSteps) {
       setCurrentStep(currentStep + 1)
-      // Auto-save form data
-      formPersistence.autoSave(formData)
-      
+
+
       toast({
         title: "Step Completed!",
         description: `Moving to step ${currentStep + 1}`,
@@ -181,9 +280,9 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (isSubmitting) return
-    
+
     // Final validation
     if (!validateCurrentStep()) {
       toast({
@@ -209,14 +308,13 @@ export default function RegisterPage() {
 
     try {
       const submitFormData = new FormData()
-      
+
       // Add all form fields with proper cleaning
       Object.entries(formData).forEach(([key, value]) => {
         if (value !== null && value !== '') {
           if (key === 'confirmPassword') return // don't send confirmPassword
-          if (value instanceof File) {
-            submitFormData.append(key, value)
-          } else if (key === 'mobile' || key.includes('Mobile')) {
+
+          if (key === 'mobile' || key.includes('Mobile')) {
             // Clean phone numbers
             submitFormData.append(key, cleanPhoneNumber(value.toString()))
           } else if (key === 'email') {
@@ -238,23 +336,24 @@ export default function RegisterPage() {
       if (result.success) {
         // Show success with family code
         const familyCode = result.user?.familyCode
-        
+
         toast({
           title: "🎉 Registration Successful!",
           description: `Your unique Login ID: ${familyCode}. Please save this!`,
           variant: "success",
           duration: 10000 // Show longer for important info
         })
-        
+
         // Set success state to show family code prominently
         setRegistrationSuccess({
           show: true,
           familyCode: familyCode,
-          userName: result.user?.name
+          userName: result.user?.name,
+          loginId: result.user?.loginId
         })
-        
-        clearForm() // clear persisted draft
-        formPersistence.clearForm()
+
+
+
       } else {
         throw new Error(result.error)
       }
@@ -269,113 +368,6 @@ export default function RegisterPage() {
       setIsSubmitting(false)
       hideLoading()
     }
-  }
-
-  // Camera controls
-  const startCamera = async () => {
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.onloadedmetadata = async () => {
-          try {
-            await videoRef.current?.play()
-            setCameraActive(true)
-          } catch (playErr) {
-            console.error('Video play failed', playErr)
-          }
-        }
-      }
-    } catch (err: any) {
-      console.error('Camera access error:', err)
-      if (err?.name === 'NotAllowedError') {
-        alert('Camera permission is denied. Please enable it in your browser settings and reload the page.')
-      } else if (err?.name === 'NotFoundError') {
-        alert('No camera device found.')
-      } else if (err?.name === 'NotReadableError') {
-        alert('Camera is already in use by another application.')
-      } else {
-        alert('Unable to access camera. Error: ' + (err?.message || 'Unknown'))
-      }
-    }
-  }
-
-  const captureSelfie = () => {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas) return
-    
-    const width = video.videoWidth
-    const height = video.videoHeight
-    canvas.width = width
-    canvas.height = height
-    
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    
-    // Draw the current video frame to canvas
-    ctx.drawImage(video, 0, 0, width, height)
-    
-    // Get the image data as base64 for preview
-    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9)
-    setSelfiePreview(imageDataUrl)
-    
-    // Convert to blob and create file
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' })
-        setFormData({ ...formData, selfieFile: file })
-        stopCamera()
-        
-        toast({
-          title: "Selfie Captured!",
-          description: "Your selfie has been captured successfully.",
-          variant: "success"
-        })
-      }
-    }, 'image/jpeg', 0.9)
-  }
-
-  const stopCamera = () => {
-    const video = videoRef.current
-    if (video && video.srcObject) {
-      const tracks = (video.srcObject as MediaStream).getTracks()
-      tracks.forEach((t) => t.stop())
-      setCameraActive(false)
-    }
-  }
-
-  const requestLocation = () => {
-    if (!formData.locationConsent) {
-      alert('Please consent to share your location first.')
-      return
-    }
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser')
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setFormData({
-          ...formData,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        })
-      },
-      (err) => {
-        alert('Failed to fetch location: ' + err.message)
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
   }
 
   // Success screen
@@ -431,13 +423,13 @@ export default function RegisterPage() {
 
               <div className="bg-yellow-50 rounded-lg p-4 mb-6">
                 <p className="text-sm text-yellow-800">
-                  <strong>Next Steps:</strong> Your account is pending admin verification. 
+                  <strong>Next Steps:</strong> Your account is pending admin verification.
                   You can login but some features will be limited until verification is complete.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
+                <Button
                   onClick={() => {
                     navigator.clipboard.writeText(registrationSuccess.familyCode || '')
                     toast({
@@ -446,12 +438,12 @@ export default function RegisterPage() {
                       variant: "success"
                     })
                   }}
-                  variant="outline" 
+                  variant="outline"
                   className="flex-1"
                 >
                   📋 Copy Login ID
                 </Button>
-                <Button 
+                <Button
                   onClick={() => window.location.href = '/login'}
                   className="flex-1 bg-gradient-to-r from-orange-500 to-green-600 hover:from-orange-600 hover:to-green-700"
                 >
@@ -490,17 +482,15 @@ export default function RegisterPage() {
             <div className="flex items-center justify-between mb-2">
               {[1, 2, 3, 4].map((step) => (
                 <div key={step} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step <= currentStep 
-                      ? 'bg-gradient-to-r from-orange-500 to-green-600 text-white' 
-                      : 'bg-gray-200 text-gray-600'
-                  }`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step <= currentStep
+                    ? 'bg-gradient-to-r from-orange-500 to-green-600 text-white'
+                    : 'bg-gray-200 text-gray-600'
+                    }`}>
                     {step < currentStep ? <CheckCircle className="w-5 h-5" /> : step}
                   </div>
                   {step < 4 && (
-                    <div className={`w-16 h-1 mx-2 ${
-                      step < currentStep ? 'bg-gradient-to-r from-orange-500 to-green-600' : 'bg-gray-200'
-                    }`} />
+                    <div className={`w-16 h-1 mx-2 ${step < currentStep ? 'bg-gradient-to-r from-orange-500 to-green-600' : 'bg-gray-200'
+                      }`} />
                   )}
                 </div>
               ))}
@@ -534,7 +524,7 @@ export default function RegisterPage() {
                       id="fullName"
                       type="text"
                       value={formData.fullName}
-                      onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                       placeholder="Enter your full name"
                       className={errors.fullName ? "border-red-500" : ""}
                       required
@@ -550,14 +540,14 @@ export default function RegisterPage() {
                       id="dateOfBirth"
                       type="date"
                       value={formData.dateOfBirth}
-                      onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                       required
                     />
                   </div>
 
                   <div>
                     <Label htmlFor="gender">Gender *</Label>
-                    <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
+                    <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
@@ -571,11 +561,9 @@ export default function RegisterPage() {
 
                   <div>
                     <Label htmlFor="placeOfBirth">Place of Birth</Label>
-                    <Input
-                      id="placeOfBirth"
-                      type="text"
+                    <LocationInput
                       value={formData.placeOfBirth}
-                      onChange={(e) => setFormData({...formData, placeOfBirth: e.target.value})}
+                      onChange={(value) => setFormData({ ...formData, placeOfBirth: value })}
                       placeholder="City, State"
                     />
                   </div>
@@ -586,7 +574,7 @@ export default function RegisterPage() {
                       id="mobile"
                       type="tel"
                       value={formData.mobile}
-                      onChange={(e) => setFormData({...formData, mobile: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                       placeholder="Enter 10-digit mobile number"
                       className={errors.mobile ? "border-red-500" : ""}
                       required
@@ -603,9 +591,10 @@ export default function RegisterPage() {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="Enter email address"
                       className={errors.email ? "border-red-500" : ""}
+                      onBlur={checkEmailUniqueness}
                       required
                     />
                     {errors.email && (
@@ -620,7 +609,7 @@ export default function RegisterPage() {
                         id="password"
                         type={showPassword ? "text" : "password"}
                         value={formData.password}
-                        onChange={(e) => setFormData({...formData, password: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         placeholder="Enter a secure password"
                         className={errors.password ? "border-red-500" : ""}
                         required
@@ -652,7 +641,7 @@ export default function RegisterPage() {
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
                         value={formData.confirmPassword}
-                        onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                         placeholder="Re-enter password"
                         className={errors.confirmPassword ? "border-red-500" : ""}
                         required
@@ -702,7 +691,7 @@ export default function RegisterPage() {
                         id="familyCode"
                         type="text"
                         value={formData.familyCode}
-                        onChange={(e) => setFormData({...formData, familyCode: e.target.value.toUpperCase()})}
+                        onChange={(e) => setFormData({ ...formData, familyCode: e.target.value.toUpperCase() })}
                         placeholder="Enter family code"
                       />
                       <Button
@@ -750,13 +739,15 @@ export default function RegisterPage() {
 
                   <div>
                     <Label htmlFor="nativePlace">Native Place</Label>
-                    <Input
-                      id="nativePlace"
-                      type="text"
+                    <LocationInput
                       value={formData.nativePlace}
-                      onChange={(e) => setFormData({...formData, nativePlace: e.target.value})}
-                      placeholder="Village/City, State"
+                      onChange={(value) => setFormData({ ...formData, nativePlace: value })}
+                      placeholder="Search ancestral village or town"
+                      className={errors.nativePlace ? "border-red-500" : ""}
                     />
+                    {errors.nativePlace && (
+                      <p className="text-sm text-red-500 mt-1">{errors.nativePlace}</p>
+                    )}
                   </div>
 
                   <div>
@@ -765,45 +756,64 @@ export default function RegisterPage() {
                       id="caste"
                       type="text"
                       value={formData.caste}
-                      onChange={(e) => setFormData({...formData, caste: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, caste: e.target.value })}
                       placeholder="Enter caste or community"
                     />
                   </div>
 
                   <div className="md:col-span-2">
                     <Label>References</Label>
+                    <p className="text-xs text-yellow-600 mb-2 bg-yellow-50 p-2 rounded border border-yellow-200">
+                      <strong>Note:</strong> Please provide contacts of community friends or neighbors, NOT family members. These references may be used for verification if needed in the future. They will not be contacted immediately.
+                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                       <div>
                         <Input
                           type="text"
                           value={formData.reference1Name}
-                          onChange={(e) => setFormData({...formData, reference1Name: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, reference1Name: e.target.value })}
                           placeholder="Reference 1 Name"
+                          className={errors.reference1Name ? "border-red-500" : ""}
                         />
+                        {errors.reference1Name && (
+                          <p className="text-sm text-red-500 mt-1">{errors.reference1Name}</p>
+                        )}
                       </div>
                       <div>
                         <Input
                           type="tel"
                           value={formData.reference1Mobile}
-                          onChange={(e) => setFormData({...formData, reference1Mobile: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, reference1Mobile: e.target.value })}
                           placeholder="Reference 1 Mobile"
+                          className={errors.reference1Mobile ? "border-red-500" : ""}
                         />
+                        {errors.reference1Mobile && (
+                          <p className="text-sm text-red-500 mt-1">{errors.reference1Mobile}</p>
+                        )}
                       </div>
                       <div>
                         <Input
                           type="text"
                           value={formData.reference2Name}
-                          onChange={(e) => setFormData({...formData, reference2Name: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, reference2Name: e.target.value })}
                           placeholder="Reference 2 Name"
+                          className={errors.reference2Name ? "border-red-500" : ""}
                         />
+                        {errors.reference2Name && (
+                          <p className="text-sm text-red-500 mt-1">{errors.reference2Name}</p>
+                        )}
                       </div>
                       <div>
                         <Input
                           type="tel"
                           value={formData.reference2Mobile}
-                          onChange={(e) => setFormData({...formData, reference2Mobile: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, reference2Mobile: e.target.value })}
                           placeholder="Reference 2 Mobile"
+                          className={errors.reference2Mobile ? "border-red-500" : ""}
                         />
+                        {errors.reference2Mobile && (
+                          <p className="text-sm text-red-500 mt-1">{errors.reference2Mobile}</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -811,239 +821,129 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* Step 3: Document Upload */}
+            {/* Step 3: Document Verification */}
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div className="bg-orange-50 p-4 rounded-lg">
                   <div className="flex items-start space-x-3">
-                    <Upload className="w-5 h-5 text-orange-500 mt-0.5" />
+                    <Shield className="w-5 h-5 text-orange-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-orange-800">Document Verification</p>
+                      <p className="text-sm font-medium text-orange-800">Identity Verification</p>
                       <p className="text-xs text-orange-700 mt-1">
-                        Upload required documents for identity verification
+                        Provide your government issued identity details
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="border-2 border-dashed border-orange-200 hover:border-orange-300 transition-colors">
-                    <CardHeader className="text-center">
-                      <Badge className="w-fit mx-auto mb-2 bg-orange-100 text-orange-800">Required</Badge>
-                      <CardTitle className="text-lg">Aadhaar Card</CardTitle>
-                      <CardDescription>Government issued identity proof</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        className="mb-2"
-                        onChange={(e) => setFormData({...formData, aadhaarFile: e.target.files?.[0] || null})}
-                      />
-                      <p className="text-xs text-gray-600">PDF, JPG, PNG (Max 5MB)</p>
-                    </CardContent>
-                  </Card>
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <Label htmlFor="aadhaarNumber">Aadhaar Number *</Label>
+                    <Input
+                      id="aadhaarNumber"
+                      type="text"
+                      value={formData.aadhaarNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 12)
+                        setFormData({ ...formData, aadhaarNumber: value })
+                      }}
+                      onBlur={checkAadhaarUniqueness}
+                      placeholder="Enter 12-digit Aadhaar Number"
+                      className={errors.aadhaarNumber ? "border-red-500" : ""}
+                    />
+                    {errors.aadhaarNumber && (
+                      <p className="text-sm text-red-500 mt-1">{errors.aadhaarNumber}</p>
+                    )}
+                  </div>
 
-                  <Card className="border-2 border-dashed border-gray-200 hover:border-orange-300 transition-colors">
-                    <CardHeader className="text-center">
-                      <Badge className="w-fit mx-auto mb-2 bg-red-100 text-red-800">Required</Badge>
-                      <CardTitle className="text-lg">Voter ID / Passport</CardTitle>
-                      <CardDescription>Citizenship verification</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        className="mb-2"
-                        onChange={(e) => setFormData({...formData, voterIdFile: e.target.files?.[0] || null})}
-                      />
-                      <p className="text-xs text-gray-600">PDF, JPG, PNG (Max 5MB)</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-2 border-dashed border-gray-200 hover:border-green-300 transition-colors">
-                    <CardHeader className="text-center">
-                      <Badge className="w-fit mx-auto mb-2 bg-green-100 text-green-800">Optional</Badge>
-                      <CardTitle className="text-lg">Birth Certificate</CardTitle>
-                      <CardDescription>Additional verification</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        className="mb-2"
-                        onChange={(e) => setFormData({...formData, birthCertFile: e.target.files?.[0] || null})}
-                      />
-                      <p className="text-xs text-gray-600">PDF, JPG, PNG (Max 5MB)</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-2 border-dashed border-gray-200 hover:border-green-300 transition-colors">
-                    <CardHeader className="text-center">
-                      <Badge className="w-fit mx-auto mb-2 bg-green-100 text-green-800">Optional</Badge>
-                      <CardTitle className="text-lg">Other Documents</CardTitle>
-                      <CardDescription>Ration card, domicile certificate</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        className="mb-2"
-                      />
-                      <p className="text-xs text-gray-600">PDF, JPG, PNG (Max 5MB)</p>
-                    </CardContent>
-                  </Card>
+                  <div>
+                    <Label htmlFor="panNumber">PAN Number *</Label>
+                    <Input
+                      id="panNumber"
+                      type="text"
+                      value={formData.panNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase().slice(0, 10)
+                        setFormData({ ...formData, panNumber: value })
+                      }}
+                      onBlur={checkPanUniqueness}
+                      placeholder="Enter 10-character PAN Number"
+                      className={errors.panNumber ? "border-red-500" : ""}
+                      maxLength={10}
+                    />
+                    {errors.panNumber && (
+                      <p className="text-sm text-red-500 mt-1">{errors.panNumber}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">Format: ABCDE1234F</p>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Step 4: Verification */}
+            {/* Step 4: Terms & Conditions */}
             {currentStep === 4 && (
               <div className="space-y-6">
-                <div className="bg-purple-50 p-4 rounded-lg">
+                <div className="bg-blue-50 p-4 rounded-lg">
                   <div className="flex items-start space-x-3">
-                    <Camera className="w-5 h-5 text-purple-500 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-purple-800">Final Verification Steps</p>
-                      <p className="text-xs text-purple-700 mt-1">
-                        Complete these steps to verify your identity and activate your account
+                      <p className="text-sm font-medium text-blue-800">Terms & Conditions</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Please read and accept our terms of service to complete registration
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <Card className="border-2 border-dashed border-purple-200">
-                  <CardHeader className="text-center">
-                    <Camera className="w-12 h-12 text-purple-500 mx-auto mb-2" />
-                    <CardTitle>Live Selfie Verification</CardTitle>
-                    <CardDescription>Take a clear selfie for face matching with your ID</CardDescription>
+                <Card className="border-2 border-gray-200">
+                  <CardHeader>
+                    <CardTitle>Terms of Service</CardTitle>
+                    <CardDescription>Read to the bottom to accept</CardDescription>
                   </CardHeader>
-                  <CardContent className="text-center">
-                    <div className="flex flex-col items-center space-y-3 mb-4">
-                      {!cameraActive ? (
-                        <Button variant="outline" onClick={startCamera}>
-                          <Camera className="w-4 h-4 mr-2" />
-                          Start Camera
-                        </Button>
-                      ) : (
-                        <div className="flex items-center space-x-2">
-                          <Button type="button" variant="outline" onClick={captureSelfie}>
-                            <Camera className="w-4 h-4 mr-2" />
-                            Capture Selfie
-                          </Button>
-                          <Button type="button" variant="ghost" onClick={stopCamera}>Stop</Button>
-                        </div>
-                      )}
-                      {/* Video feed when camera is active */}
-                      {cameraActive && (
-                        <video ref={videoRef} className="w-full max-w-xs rounded border" autoPlay playsInline muted />
-                      )}
-                      
-                      {/* Selfie preview when captured */}
-                      {selfiePreview && !cameraActive && (
-                        <div className="flex flex-col items-center space-y-2">
-                          <img 
-                            src={selfiePreview} 
-                            alt="Captured selfie" 
-                            className="w-full max-w-xs rounded border"
-                          />
-                          <div className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                            <p className="text-sm text-green-700">Selfie captured successfully!</p>
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => { 
-                              setFormData({ ...formData, selfieFile: null })
-                              setSelfiePreview(null)
-                              startCamera()
-                            }}
-                          >
-                            Retake Selfie
-                          </Button>
-                        </div>
-                      )}
-                      
-                      <canvas ref={canvasRef} className="hidden" />
-                    </div>
-                    <div className="mt-4">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] || null
-                          if (file) {
-                            stopCamera()
-                            setFormData({ ...formData, selfieFile: file })
-                            
-                            // Create preview for uploaded file
-                            const reader = new FileReader()
-                            reader.onload = (e) => {
-                              setSelfiePreview(e.target?.result as string)
-                            }
-                            reader.readAsDataURL(file)
-                            
+                  <CardContent>
+                    <div
+                      className="h-64 overflow-y-auto border rounded-md p-4 mb-4 text-sm text-gray-600 bg-gray-50"
+                      onScroll={(e) => {
+                        const element = e.currentTarget
+                        if (Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 1) {
+                          if (!formData.termsAccepted) {
+                            setFormData({ ...formData, termsAccepted: true })
                             toast({
-                              title: "Selfie Uploaded!",
-                              description: "Your selfie has been uploaded successfully.",
+                              title: "Terms Accepted",
+                              description: "You have scrolled to the bottom and accepted the terms.",
                               variant: "success"
                             })
                           }
-                        }}
-                      />
+                        }
+                      }}
+                    >
+                      <p className="mb-4"><strong>1. Introduction</strong><br />Welcome to Bharat Vanshavali. By accessing our website, you agree to these terms and conditions.</p>
+                      <p className="mb-4"><strong>2. Privacy Policy</strong><br />We value your privacy. Your personal data, including Aadhaar and PAN information, is stored securely and used only for identity verification purposes.</p>
+                      <p className="mb-4"><strong>3. User Responsibilities</strong><br />You are responsible for maintaining the confidentiality of your account and password. You agree to accept responsibility for all activities that occur under your account.</p>
+                      <p className="mb-4"><strong>4. Data Accuracy</strong><br />You certify that the information provided, including family details and identity proof, is accurate and true to the best of your knowledge.</p>
+                      <p className="mb-4"><strong>5. Prohibited Activities</strong><br />You may not use the service for any illegal or unauthorized purpose. You must not transmit any worms or viruses or any code of a destructive nature.</p>
+                      <p className="mb-4"><strong>6. Termination</strong><br />We reserve the right to terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever.</p>
+                      <p className="mb-4"><strong>7. Changes to Terms</strong><br />We reserve the right, at our sole discretion, to modify or replace these Terms at any time.</p>
+                      <p className="mb-4"><strong>8. Contact Us</strong><br />If you have any questions about these Terms, please contact us.</p>
+                      <p className="mb-4"><strong>9. Governing Law</strong><br />These Terms shall be governed and construed in accordance with the laws of India, without regard to its conflict of law provisions.</p>
+                      <p><strong>10. Final Agreement</strong><br />By clicking "Complete Registration", you acknowledge that you have read, understood, and agree to be bound by these terms.</p>
                     </div>
-                    <p className="text-xs text-gray-600 mt-2">
-                      Ensure good lighting and look directly at the camera
-                    </p>
-                  </CardContent>
-                </Card>
 
-                <Card className="border-2 border-dashed border-green-200">
-                  <CardHeader className="text-center">
-                    <MapPin className="w-12 h-12 text-green-500 mx-auto mb-2" />
-                    <CardTitle>Location Verification</CardTitle>
-                    <CardDescription>Verify your current location for security</CardDescription>
-                  </CardHeader>
-                  <CardContent className="text-center">
-                    <div className="flex items-center justify-center space-x-4 mb-4">
-                      <Checkbox
-                        id="locationConsent"
-                        checked={formData.locationConsent}
-                        onCheckedChange={(checked) => setFormData({...formData, locationConsent: checked as boolean})}
-                      />
-                      <Label htmlFor="locationConsent" className="text-sm">
-                        I consent to share my location for verification
-                      </Label>
-                    </div>
-                    <Button variant="outline" type="button" onClick={requestLocation}>
-                      <MapPin className="w-4 h-4 mr-2" />
-                      Verify Location
-                    </Button>
-                    {(formData.latitude && formData.longitude) && (
-                      <p className="text-xs text-green-700 mt-2">Location captured: {formData.latitude?.toFixed(5)}, {formData.longitude?.toFixed(5)} ✓</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-2 border-dashed border-blue-200">
-                  <CardHeader className="text-center">
-                    <AlertCircle className="w-12 h-12 text-blue-500 mx-auto mb-2" />
-                    <CardTitle>Terms & Conditions</CardTitle>
-                    <CardDescription>Review and accept our terms of service</CardDescription>
-                  </CardHeader>
-                  <CardContent className="text-center">
-                    <div className="flex items-center justify-center space-x-4 mb-4">
+                    <div className="flex items-center justify-center space-x-4 p-4 bg-gray-50 rounded-lg border">
                       <Checkbox
                         id="termsAccepted"
                         checked={formData.termsAccepted}
-                        onCheckedChange={(checked) => setFormData({...formData, termsAccepted: checked as boolean})}
+                        onCheckedChange={(checked) => setFormData({ ...formData, termsAccepted: checked as boolean })}
+                        disabled={!formData.termsAccepted} // Only allow auto-tick via scroll
                         required
                       />
-                      <Label htmlFor="termsAccepted" className="text-sm">
-                        I agree to the <Link href="/terms" className="text-blue-600 hover:underline">Terms of Service</Link> and <Link href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</Link>
+                      <Label htmlFor="termsAccepted" className="text-sm cursor-pointer">
+                        I agree to the Terms of Service and Privacy Policy
                       </Label>
                     </div>
+                    <p className="text-xs text-center text-gray-500 mt-2">
+                      (Scroll to the bottom of the text above to enable acceptance)
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -1059,7 +959,7 @@ export default function RegisterPage() {
               >
                 Previous
               </Button>
-              
+
               {currentStep < totalSteps ? (
                 <Button
                   type="button"

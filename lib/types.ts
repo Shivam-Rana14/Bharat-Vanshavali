@@ -9,15 +9,13 @@ export interface User {
   avatar?: string
 }
 
-// Family Member Types
+// Family Member Types 
 export interface FamilyMember {
   id: string
   name: string
   relationship: string
   dateOfBirth?: string
-  dateOfDeath?: string
   gender: 'male' | 'female' | 'other'
-  isAlive: boolean
   photo?: string
   bio?: string
   location?: string
@@ -98,8 +96,6 @@ export interface AddMemberForm {
   relationship: string
   gender: 'male' | 'female' | 'other'
   dateOfBirth?: string
-  dateOfDeath?: string
-  isAlive: boolean
   location?: string
   occupation?: string
   bio?: string
@@ -144,4 +140,4 @@ export interface PaginatedResponse<T> {
     hasNext: boolean
     hasPrev: boolean
   }
-} 
+}

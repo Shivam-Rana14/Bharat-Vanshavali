@@ -14,6 +14,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: pendingUsers })
     }
 
+    if (status === 'verified') {
+      const verifiedUsers = await databaseService.getVerifiedUsers()
+      return NextResponse.json({ success: true, data: verifiedUsers })
+    }
+
     // Default: return dashboard stats
     const stats = await databaseService.getDashboardStats()
     return NextResponse.json({ success: true, data: stats })

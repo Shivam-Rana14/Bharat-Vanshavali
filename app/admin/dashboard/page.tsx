@@ -1,111 +1,67 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, CheckCircle, XCircle, Clock, Eye, TreePine, FileText, UserCheck } from 'lucide-react'
+import { Users, CheckCircle, XCircle, Clock, Eye, TreePine, FileText, UserCheck, Edit, Plus, KeyRound } from 'lucide-react'
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/layout/navbar"
 import { ConfirmationModal } from "@/components/ui/confirmation-modal"
-import { DocumentViewerModal } from "@/components/ui/document-viewer-modal"
 import { useToast } from "@/hooks/use-toast"
-
-// DEVELOPMENT ONLY - Extended Mock Data for Testing
-const mockPendingUsers = [
-  {
-    id: "REG001",
-    loginId: "BV123456",
-    name: "Rajesh Kumar",
-    fatherName: "Ram Kumar",
-    motherName: "Sita Devi",
-    placeOfBirth: "Delhi, Delhi",
-    mobile: "+91 9876543210",
-    email: "rajesh.kumar@email.com",
-    documents: [
-      { name: "Aadhaar Card", type: "jpg", url: "/placeholder.svg?height=400&width=600&text=Aadhaar", uploadDate: "2024-01-15" },
-      { name: "Voter ID", type: "jpg", url: "/placeholder.svg?height=400&width=600&text=VoterID", uploadDate: "2024-01-15" }
-    ],
-    status: "pending",
-    submittedAt: "2024-01-15",
-    familyCode: "FAM001",
-    dateOfBirth: "1990-05-15",
-    caste: "General",
-    grandfatherName: "Mohan Kumar",
-    nativePlace: "Mathura, UP"
-  },
-  {
-    id: "REG002",
-    loginId: "BVC001235",
-    name: "Priya Sharma",
-    fatherName: "Suresh Sharma",
-    motherName: "Meera Sharma",
-    placeOfBirth: "Mumbai, Maharashtra",
-    mobile: "+91 9876543211",
-    email: "priya.sharma@email.com",
-    documents: [
-      { name: "Aadhaar Card", type: "pdf", url: "/placeholder.svg?height=400&width=600&text=Aadhaar", uploadDate: "2024-01-16" },
-      { name: "Passport", type: "jpg", url: "/placeholder.svg?height=400&width=600&text=Passport", uploadDate: "2024-01-16" }
-    ],
-    status: "pending",
-    submittedAt: "2024-01-16",
-    familyCode: "FAM002",
-    dateOfBirth: "1988-08-22",
-    caste: "OBC",
-    grandfatherName: "Ramesh Sharma",
-    nativePlace: "Pune, Maharashtra"
-  }
-]
-
-const mockVerifiedUsers = [
-  {
-    id: "VER001",
-    loginId: "BVC001100",
-    name: "Amit Patel",
-    fatherName: "Kishore Patel",
-    motherName: "Kiran Patel",
-    placeOfBirth: "Ahmedabad, Gujarat",
-    mobile: "+91 9876543100",
-    email: "amit.patel@email.com",
-    documents: [
-      { name: "Aadhaar Card", type: "jpg", url: "/placeholder.svg?height=400&width=600&text=Aadhaar", uploadDate: "2024-01-10" },
-      { name: "Voter ID", type: "jpg", url: "/placeholder.svg?height=400&width=600&text=VoterID", uploadDate: "2024-01-10" }
-    ],
-    status: "verified",
-    verifiedAt: "2024-01-10",
-    familyCode: "FAM100",
-    familyMembers: 5,
-    dateOfBirth: "1985-07-12",
-    caste: "General",
-    grandfatherName: "Ramesh Patel"
-  }
-]
+import { FamilyMembersModal } from "@/components/admin/family-members-modal"
+import { MemberFormModal } from "@/components/admin/member-form-modal"
+import { ResetPasswordModal } from "@/components/admin/reset-password-modal"
+import { PaymentInfoModal } from "@/components/admin/PaymentInfoModal"
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState("pending")
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab')
+    return tab === 'verified' || tab === 'pending' || tab === 'families' ? tab : 'pending'
+  })
   const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [selectedFamily, setSelectedFamily] = useState<any>(null)
+  const [familyMembers, setFamilyMembers] = useState<any[]>([])
+  const [selectedMember, setSelectedMember] = useState<any>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
+  const [resetPasswordUser, setResetPasswordUser] = useState<any>(null)
+  const [paymentInfoUser, setPaymentInfoUser] = useState<{ id: string; name: string } | null>(null)
+
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean
     type: 'verify' | 'reject'
     user: any
   }>({ isOpen: false, type: 'verify', user: null })
-  const [documentModal, setDocumentModal] = useState<{
-    isOpen: boolean
-    user: any
-  }>({ isOpen: false, user: null })
-  
+
   const router = useRouter()
   const { toast } = useToast()
-
   const { user } = useAuth()
+
+  const [stats, setStats] = useState({
+    pendingVerifications: 0,
+    verifiedCitizens: 0,
+    totalFamilies: 0,
+    activeUsers: 0
+  })
   const [pendingUsers, setPendingUsers] = useState<any[]>([])
-  const [dashboardStats, setDashboardStats] = useState<any>({})
+  const [verifiedUsers, setVerifiedUsers] = useState<any[]>([])
+  const [families, setFamilies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Sync tab with URL param when it changes (e.g. navbar link clicked)
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab === 'verified' || tab === 'pending' || tab === 'families') {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (!user) {
@@ -123,20 +79,33 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [statsResponse, pendingResponse] = await Promise.all([
-        fetch('/api/admin/users'),
-        fetch('/api/admin/users?status=pending')
+      setLoading(true)
+      const [statsResponse, pendingResponse, verifiedResponse, familiesResponse] = await Promise.all([
+        fetch('/api/admin/stats', { cache: 'no-store' }),
+        fetch('/api/admin/users?status=pending', { cache: 'no-store' }),
+        fetch('/api/admin/users?status=verified', { cache: 'no-store' }),
+        fetch('/api/admin/families', { cache: 'no-store' })
       ])
 
       const statsResult = await statsResponse.json()
       const pendingResult = await pendingResponse.json()
+      const verifiedResult = await verifiedResponse.json()
+      const familiesResult = await familiesResponse.json()
 
       if (statsResult.success) {
-        setDashboardStats(statsResult.data)
+        setStats(statsResult.data)
       }
 
       if (pendingResult.success) {
-        setPendingUsers(pendingResult.data)
+        setPendingUsers(Array.isArray(pendingResult.data) ? pendingResult.data : [])
+      }
+
+      if (verifiedResult.success) {
+        setVerifiedUsers(Array.isArray(verifiedResult.data) ? verifiedResult.data : [])
+      }
+
+      if (familiesResult.success) {
+        setFamilies(Array.isArray(familiesResult.data) ? familiesResult.data : [])
       }
     } catch (error) {
       console.error('Error fetching admin data:', error)
@@ -150,6 +119,25 @@ export default function AdminDashboard() {
     }
   }
 
+  const fetchFamilyMembers = async (familyCode: string) => {
+    try {
+      const response = await fetch(`/api/admin/families/${familyCode}/members`, { cache: 'no-store' })
+      const result = await response.json()
+
+      if (result.success) {
+        setFamilyMembers(result.data.members)
+        setSelectedFamily({ ...selectedFamily, ...result.data.familyInfo })
+      }
+    } catch (error) {
+      console.error('Error fetching family members:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load family members",
+        variant: "destructive"
+      })
+    }
+  }
+
   const handleVerifyUser = (user: any) => {
     setConfirmModal({ isOpen: true, type: 'verify', user })
   }
@@ -159,8 +147,8 @@ export default function AdminDashboard() {
   }
 
   const confirmAction = async () => {
-    const { type, user } = confirmModal
-    
+    const { type, user: targetUser } = confirmModal
+
     try {
       const response = await fetch('/api/admin/verify-user', {
         method: 'POST',
@@ -168,7 +156,7 @@ export default function AdminDashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: user.id,
+          userId: targetUser._id,
           action: type
         }),
       })
@@ -179,19 +167,20 @@ export default function AdminDashboard() {
         if (type === 'verify') {
           toast({
             title: "User Verified",
-            description: `${user.full_name} has been verified and activated successfully!`,
-            variant: "success"
+            description: `${targetUser.fullName} has been verified successfully!`,
           })
         } else {
           toast({
             title: "User Rejected",
-            description: `${user.full_name}'s application has been rejected.`,
+            description: `${targetUser.fullName}'s application has been rejected.`,
             variant: "destructive"
           })
         }
-        
-        // Refresh the data
+
         await fetchData()
+        if (selectedFamily) {
+          await fetchFamilyMembers(selectedFamily.familyCode)
+        }
       } else {
         throw new Error(result.error)
       }
@@ -202,12 +191,33 @@ export default function AdminDashboard() {
         variant: "destructive"
       })
     }
-    
+
     setConfirmModal({ isOpen: false, type: 'verify', user: null })
   }
 
-  const viewDocuments = (user: any) => {
-    setDocumentModal({ isOpen: true, user })
+  const handleFamilyClick = async (family: any) => {
+    setSelectedFamily(family)
+    await fetchFamilyMembers(family.familyCode)
+  }
+
+  const handleEditMember = (member: any) => {
+    setSelectedMember(member)
+    setShowEditModal(true)
+  }
+
+  const handleViewDetails = (user: any) => {
+    setSelectedUser(user)
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="flex items-center justify-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+      </>
+    )
   }
 
   return (
@@ -223,7 +233,7 @@ export default function AdminDashboard() {
                 <Clock className="h-4 w-4 text-orange-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{mockPendingUsers.length}</div>
+                <div className="text-2xl font-bold text-orange-600">{stats.pendingVerifications}</div>
               </CardContent>
             </Card>
 
@@ -233,7 +243,7 @@ export default function AdminDashboard() {
                 <UserCheck className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{mockVerifiedUsers.length}</div>
+                <div className="text-2xl font-bold text-green-600">{stats.verifiedCitizens}</div>
               </CardContent>
             </Card>
 
@@ -243,7 +253,7 @@ export default function AdminDashboard() {
                 <TreePine className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{mockVerifiedUsers.length + mockPendingUsers.length}</div>
+                <div className="text-2xl font-bold text-blue-600">{stats.totalFamilies}</div>
               </CardContent>
             </Card>
 
@@ -253,209 +263,361 @@ export default function AdminDashboard() {
                 <Users className="h-4 w-4 text-purple-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">{(mockVerifiedUsers.length + mockPendingUsers.length) * 3}</div>
+                <div className="text-2xl font-bold text-purple-600">{stats.activeUsers}</div>
               </CardContent>
             </Card>
           </div>
 
           {/* Main Content */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <Tabs value={activeTab} onValueChange={(val) => {
+            setActiveTab(val)
+            router.replace(`/admin/dashboard?tab=${val}`, { scroll: false })
+          }}>
+            <TabsList className="grid w-full grid-cols-3 max-w-2xl">
               <TabsTrigger value="pending">Pending Verifications</TabsTrigger>
               <TabsTrigger value="verified">Verified Citizens</TabsTrigger>
+              <TabsTrigger value="families">Families</TabsTrigger>
             </TabsList>
 
+            {/* Pending Tab */}
             <TabsContent value="pending" className="mt-6">
               <div className="grid gap-6">
-                {mockPendingUsers.map((user) => (
-                  <Card key={user.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{user.name}</CardTitle>
-                          <CardDescription>Login ID: {user.loginId}</CardDescription>
-                        </div>
-                        <Badge variant="outline" className="text-orange-600 border-orange-200">
-                          <Clock className="w-3 h-3 mr-1" />
-                          Pending
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <p className="text-sm text-gray-600">Father: {user.fatherName}</p>
-                          <p className="text-sm text-gray-600">Mother: {user.motherName}</p>
-                          <p className="text-sm text-gray-600">Place of Birth: {user.placeOfBirth}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Mobile: {user.mobile}</p>
-                          <p className="text-sm text-gray-600">Submitted: {user.submittedAt}</p>
-                          <p className="text-sm text-gray-600">Documents: {user.documents.length} files</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-3">
-                        <Button
-                          onClick={() => setSelectedUser(user)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-1"
-                        >
-                          <Eye className="w-4 h-4" />
-                          <span>View Details</span>
-                        </Button>
-                        <Button
-                          onClick={() => viewDocuments(user)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-1"
-                        >
-                          <FileText className="w-4 h-4" />
-                          <span>View Documents</span>
-                        </Button>
-                        <Button
-                          onClick={() => handleVerifyUser(user)}
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700 flex items-center space-x-1"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          <span>Verify & Activate</span>
-                        </Button>
-                        <Button
-                          onClick={() => handleRejectUser(user)}
-                          variant="destructive"
-                          size="sm"
-                          className="flex items-center space-x-1"
-                        >
-                          <XCircle className="w-4 h-4" />
-                          <span>Reject</span>
-                        </Button>
-                      </div>
+                {pendingUsers.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-gray-500">
+                      No pending verifications
                     </CardContent>
                   </Card>
-                ))}
+                ) : (
+                  pendingUsers.map((user) => (
+                    <Card key={user._id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{user.fullName}</CardTitle>
+                            <CardDescription>Login ID: {user.loginId}</CardDescription>
+                          </div>
+                          <Badge variant="outline" className="text-orange-600 border-orange-200">
+                            <Clock className="w-3 h-3 mr-1" />
+                            Pending
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <p className="text-sm text-gray-600">Father: {user.fatherName || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Mother: {user.motherName || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Place of Birth: {user.placeOfBirth || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Mobile: {user.phone || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Email: {user.email || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Family Code: {user.familyCode || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          <Button
+                            onClick={() => handleViewDetails(user)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-1"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>View Details</span>
+                          </Button>
+                          <Button
+                            onClick={() => setPaymentInfoUser({ id: user._id, name: user.fullName })}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                          >
+                            <FileText className="w-4 h-4" />
+                            <span>View Payment</span>
+                          </Button>
+                          <Button
+                            onClick={() => handleVerifyUser(user)}
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 flex items-center space-x-1"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            <span>Verify & Activate</span>
+                          </Button>
+                          <Button
+                            onClick={() => handleRejectUser(user)}
+                            variant="destructive"
+                            size="sm"
+                            className="flex items-center space-x-1"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            <span>Reject</span>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             </TabsContent>
 
+            {/* Verified Tab */}
             <TabsContent value="verified" className="mt-6">
               <div className="grid gap-6">
-                {mockVerifiedUsers.map((user) => (
-                  <Card key={user.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{user.name}</CardTitle>
-                          <CardDescription>Login ID: {user.loginId}</CardDescription>
-                        </div>
-                        <Badge className="bg-green-100 text-green-800">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Verified
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <p className="text-sm text-gray-600">Father: {user.fatherName}</p>
-                          <p className="text-sm text-gray-600">Mother: {user.motherName}</p>
-                          <p className="text-sm text-gray-600">Place of Birth: {user.placeOfBirth}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Mobile: {user.mobile}</p>
-                          <p className="text-sm text-gray-600">Verified: {user.verifiedAt}</p>
-                          <p className="text-sm text-gray-600">Family Members: {user.familyMembers}</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-3">
-                        <Link href={`/admin/family-tree/${user.loginId}`}>
-                          <Button variant="outline" size="sm" className="flex items-center space-x-1">
-                            <TreePine className="w-4 h-4" />
-                            <span>View Family Tree</span>
-                          </Button>
-                        </Link>
-                        <Button
-                          onClick={() => viewDocuments(user)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-1"
-                        >
-                          <FileText className="w-4 h-4" />
-                          <span>View Documents</span>
-                        </Button>
-                        <Button
-                          onClick={() => setSelectedUser(user)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-1"
-                        >
-                          <Eye className="w-4 h-4" />
-                          <span>View Profile</span>
-                        </Button>
-                      </div>
+                {verifiedUsers.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-gray-500">
+                      No verified users yet
                     </CardContent>
                   </Card>
-                ))}
+                ) : (
+                  verifiedUsers.map((user) => (
+                    <Card key={user._id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{user.fullName}</CardTitle>
+                            <CardDescription>Login ID: {user.loginId}</CardDescription>
+                          </div>
+                          <Badge className="bg-green-100 text-green-800">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Verified
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <p className="text-sm text-gray-600">Father: {user.fatherName || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Mother: {user.motherName || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Place of Birth: {user.placeOfBirth || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Mobile: {user.phone || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Email: {user.email || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Family Code: {user.familyCode || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          <Button
+                            onClick={() => handleViewDetails(user)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-1"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>View Profile</span>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Families Tab */}
+            <TabsContent value="families" className="mt-6">
+              <div className="grid gap-6">
+                {families.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-gray-500">
+                      No families found
+                    </CardContent>
+                  </Card>
+                ) : (
+                  families.map((family) => (
+                    <Card
+                      key={family.familyCode}
+                      className="hover:shadow-lg transition-shadow cursor-pointer"
+                      onClick={() => handleFamilyClick(family)}
+                    >
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{family.familyName}</CardTitle>
+                            <CardDescription>Family Code: {family.familyCode}</CardDescription>
+                          </div>
+                          <TreePine className="h-6 w-6 text-blue-500" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Total Members</p>
+                            <p className="text-lg font-semibold">{family.stats?.totalMembers || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Verified</p>
+                            <p className="text-lg font-semibold text-green-600">{family.stats?.verifiedMembers || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Pending</p>
+                            <p className="text-lg font-semibold text-orange-600">{family.stats?.pendingMembers || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Root Member</p>
+                            <p className="text-sm font-medium">{family.rootUserId?.fullName || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             </TabsContent>
           </Tabs>
 
           {/* User Details Modal */}
           {selectedUser && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <Card className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+              <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>User Details - {selectedUser.name}</CardTitle>
-                    <Button
-                      onClick={() => setSelectedUser(null)}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      <XCircle className="w-4 h-4" />
-                    </Button>
+                    <CardTitle>User Details - {selectedUser.fullName}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => setResetPasswordUser(selectedUser)}
+                        variant="outline"
+                        size="sm"
+                        className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                      >
+                        <KeyRound className="w-4 h-4 mr-1" />
+                        Reset Password
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedUser(null)}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-lg mb-3">Personal Information</h4>
+                      <div><strong>Login ID:</strong> {selectedUser.loginId}</div>
+                      <div><strong>Full Name:</strong> {selectedUser.fullName}</div>
+                      <div><strong>Email:</strong> {selectedUser.email || 'N/A'}</div>
+                      <div><strong>Phone:</strong> {selectedUser.phone || 'N/A'}</div>
+                      <div><strong>Date of Birth:</strong> {selectedUser.dateOfBirth ? new Date(selectedUser.dateOfBirth).toLocaleDateString() : 'N/A'}</div>
+                      <div><strong>Gender:</strong> {selectedUser.gender || 'N/A'}</div>
+                      <div><strong>Place of Birth:</strong> {selectedUser.placeOfBirth || 'N/A'}</div>
+                      <div><strong>Native Place:</strong> {selectedUser.nativePlace || 'N/A'}</div>
+                      <div><strong>Caste:</strong> {selectedUser.caste || 'N/A'}</div>
+                    </div>
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-lg mb-3">Family & Documents</h4>
+                      <div><strong>Father Name:</strong> {selectedUser.fatherName || 'N/A'}</div>
+                      <div><strong>Mother Name:</strong> {selectedUser.motherName || 'N/A'}</div>
+                      <div><strong>Grandfather Name:</strong> {selectedUser.grandfatherName || 'N/A'}</div>
+                      <div><strong>Spouse Name:</strong> {selectedUser.spouseName || 'N/A'}</div>
+                      <div><strong>Occupation:</strong> {selectedUser.occupation || 'N/A'}</div>
+                      <div><strong>Aadhaar Number:</strong> {selectedUser.aadhaarNumber || 'N/A'}</div>
+                      <div><strong>PAN Number:</strong> {selectedUser.panNumber || 'N/A'}</div>
+                      <div><strong>Family Code:</strong> {selectedUser.familyCode || 'N/A'}</div>
                       <div>
-                        <h4 className="font-semibold mb-2">Personal Information</h4>
-                        <p><strong>Login ID:</strong> {selectedUser.loginId}</p>
-                        <p><strong>Name:</strong> {selectedUser.name}</p>
-                        <p><strong>Father:</strong> {selectedUser.fatherName}</p>
-                        <p><strong>Mother:</strong> {selectedUser.motherName}</p>
-                        <p><strong>Place of Birth:</strong> {selectedUser.placeOfBirth}</p>
-                        <p><strong>Date of Birth:</strong> {selectedUser.dateOfBirth}</p>
-                        <p><strong>Mobile:</strong> {selectedUser.mobile}</p>
-                        <p><strong>Email:</strong> {selectedUser.email}</p>
-                        {selectedUser.caste && <p><strong>Caste:</strong> {selectedUser.caste}</p>}
-                        {selectedUser.grandfatherName && <p><strong>Grandfather:</strong> {selectedUser.grandfatherName}</p>}
-                        {selectedUser.nativePlace && <p><strong>Native Place:</strong> {selectedUser.nativePlace}</p>}
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-2">Verification Details</h4>
-                        <p><strong>Status:</strong>
-                          <Badge className={`ml-2 ${selectedUser.status === 'verified' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
-                            {selectedUser.status}
-                          </Badge>
-                        </p>
-                        <p><strong>Family Code:</strong> {selectedUser.familyCode}</p>
-                        <p><strong>Documents:</strong> {selectedUser.documents?.length || 0} files</p>
-                        {selectedUser.verifiedAt && (
-                          <p><strong>Verified On:</strong> {selectedUser.verifiedAt}</p>
-                        )}
-                        {selectedUser.submittedAt && (
-                          <p><strong>Submitted On:</strong> {selectedUser.submittedAt}</p>
-                        )}
-                        {selectedUser.familyMembers && (
-                          <p><strong>Family Members:</strong> {selectedUser.familyMembers}</p>
-                        )}
+                        <strong>Status:</strong>{' '}
+                        <Badge className={selectedUser.verificationStatus === 'verified' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}>
+                          {selectedUser.verificationStatus}
+                        </Badge>
                       </div>
                     </div>
                   </div>
+                  {selectedUser.bio && (
+                    <div className="mt-6">
+                      <h4 className="font-semibold text-lg mb-2">Bio</h4>
+                      <p className="text-gray-700">{selectedUser.bio}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {/* Payment Info Modal */}
+          {paymentInfoUser && (
+            <PaymentInfoModal
+              userId={paymentInfoUser.id}
+              userName={paymentInfoUser.name}
+              onClose={() => setPaymentInfoUser(null)}
+            />
+          )}
+
+          {/* Reset Password Modal */}
+          {resetPasswordUser && (
+            <ResetPasswordModal
+              user={resetPasswordUser}
+              onClose={() => setResetPasswordUser(null)}
+            />
+          )}
+
+          {/* Family Members Modal */}
+          {selectedFamily && (
+            <FamilyMembersModal
+              family={selectedFamily}
+              members={familyMembers}
+              onClose={() => {
+                setSelectedFamily(null)
+                setFamilyMembers([])
+              }}
+              onEditMember={handleEditMember}
+              onViewMember={handleViewDetails}
+              onVerifyMember={handleVerifyUser}
+              onRejectMember={handleRejectUser}
+              onAddMember={() => setShowAddMemberModal(true)}
+              onRefresh={() => fetchFamilyMembers(selectedFamily.familyCode)}
+            />
+          )}
+
+          {/* Edit Member Modal */}
+          {showEditModal && selectedMember && (
+            <MemberFormModal
+              member={selectedMember}
+              mode="edit"
+              onClose={() => {
+                setShowEditModal(false)
+                setSelectedMember(null)
+              }}
+              onSuccess={(updatedData) => {
+                // Immediately update local state for instant feedback
+                if (updatedData) {
+                  setFamilyMembers(prev =>
+                    prev.map(m => m._id === updatedData._id ? { ...m, ...updatedData } : m)
+                  )
+                  // Also update pendingUsers/verifiedUsers lists
+                  setPendingUsers(prev =>
+                    prev.map(u => u._id === updatedData._id ? { ...u, ...updatedData } : u)
+                  )
+                  setVerifiedUsers(prev =>
+                    prev.map(u => u._id === updatedData._id ? { ...u, ...updatedData } : u)
+                  )
+                }
+                // Background refetch for full consistency
+                fetchData()
+                if (selectedFamily) fetchFamilyMembers(selectedFamily.familyCode)
+              }}
+            />
+          )}
+
+          {/* Add Member Modal */}
+          {showAddMemberModal && selectedFamily && (
+            <MemberFormModal
+              familyCode={selectedFamily.familyCode}
+              mode="add"
+              onClose={() => setShowAddMemberModal(false)}
+              onSuccess={(newMember) => {
+                // Immediately add to local list for instant feedback
+                if (newMember) {
+                  setFamilyMembers(prev => [...prev, newMember])
+                }
+                // Background refetch for full consistency
+                fetchData()
+                if (selectedFamily) fetchFamilyMembers(selectedFamily.familyCode)
+              }}
+            />
           )}
 
           {/* Confirmation Modal */}
@@ -466,19 +628,11 @@ export default function AdminDashboard() {
             title={confirmModal.type === 'verify' ? 'Verify User' : 'Reject User'}
             description={
               confirmModal.type === 'verify'
-                ? `Are you sure you want to verify and activate ${confirmModal.user?.name}? This action will grant them full access to the platform.`
-                : `Are you sure you want to reject ${confirmModal.user?.name}'s application? This action cannot be undone.`
+                ? `Are you sure you want to verify and activate ${confirmModal.user?.fullName}? This action will grant them full access to the platform.`
+                : `Are you sure you want to reject ${confirmModal.user?.fullName}'s application? This action cannot be undone.`
             }
             confirmText={confirmModal.type === 'verify' ? 'Verify' : 'Reject'}
             countdown={3}
-          />
-
-          {/* Document Viewer Modal */}
-          <DocumentViewerModal
-            isOpen={documentModal.isOpen}
-            onClose={() => setDocumentModal({ isOpen: false, user: null })}
-            documents={documentModal.user?.documents || []}
-            memberName={documentModal.user?.name || ''}
           />
         </div>
       </div>

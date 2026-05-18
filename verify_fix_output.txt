@@ -1,0 +1,23 @@
+
+🎯 Target Family Code: TEST9106
+
+🧪 Testing Scenario: Root with 1 member joining another family...
+   - Created Old Family: TEST9685 (ID: 6920e14c05e7ddbd29ec3755)
+   - Attempting to join with lowercase code: test9106
+✅ Join successful.
+✅ User familyCode updated correctly.
+✅ Old family tree HARD DELETED.
+✅ Old FamilyMember record deleted.
+
+🎯 Target Family Code: TEST2610
+
+🧪 Testing Scenario: Root with 1 member joining another family...
+   - Created Old Family: TEST4873 (ID: 6920e2a992318eac5c68d26c)
+   - Attempting to join with lowercase code: test2610
+✅ Join successful.
+✅ User familyCode updated correctly.
+✅ Old family tree HARD DELETED.
+✅ Old FamilyMember record deleted.
+
+🧪 Testing Scenario: Join without relationship...
+✅ Join without relationship successful.
