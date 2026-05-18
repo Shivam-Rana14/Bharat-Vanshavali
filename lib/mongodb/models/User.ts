@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IUser extends Document {
-  _id: string
+  _id: any
   email?: string // Optional for placeholder users
   password?: string // Optional for placeholder users
   fullName: string

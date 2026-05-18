@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IFamilyMembersByFamily extends Document {
-  _id: string
+  _id: any
   familyCode: string
   familyTreeId: any
   familyName: string

@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IActivityLog extends Document {
-  _id: string
+  _id: any
   userId?: string
   action: string
   tableName: string

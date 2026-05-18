@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface INotification extends Document {
-  _id: string
+  _id: any
   userId: string
   type: 'verification' | 'member_added' | 'system' | 'family_update'
   title: string

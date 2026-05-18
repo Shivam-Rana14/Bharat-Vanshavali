@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IFamilyTreeNode extends Document {
-  _id: string
+  _id: any
   familyTreeId: any
   userId: any // Reference to the User this node represents
   position: {

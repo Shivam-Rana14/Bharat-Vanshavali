@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IFamilyTreeConnection extends Document {
-  _id: string
+  _id: any
   familyTreeId: any
   sourceNodeId: any // Source FamilyTreeNode ID
   targetNodeId: any // Target FamilyTreeNode ID

@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IPayment extends Document {
-  _id: string
+  _id: any
   userId: string           // The member being paid for
   paidByUserId: string     // Root member who made the payment
   familyCode: string

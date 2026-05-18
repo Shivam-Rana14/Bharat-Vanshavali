@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IUserReference extends Document {
-  _id: string
+  _id: any
   userId: string
   referenceName: string
   referencePhone: string
