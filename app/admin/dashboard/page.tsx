@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
@@ -19,7 +19,7 @@ import { MemberFormModal } from "@/components/admin/member-form-modal"
 import { ResetPasswordModal } from "@/components/admin/reset-password-modal"
 import { PaymentInfoModal } from "@/components/admin/PaymentInfoModal"
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get('tab')
@@ -637,5 +637,19 @@ export default function AdminDashboard() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function AdminDashboard() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500" />
+        </div>
+      }
+    >
+      <AdminDashboardContent />
+    </Suspense>
   )
 }
