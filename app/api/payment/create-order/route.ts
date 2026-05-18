@@ -6,10 +6,17 @@ import Payment from '@/lib/mongodb/models/Payment'
 import FamilyTree from '@/lib/mongodb/models/FamilyTree'
 import { getAuthenticatedUser } from '@/lib/api-utils'
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!
-})
+
+// Lazily initialize Razorpay inside handler to avoid build-time crash
+// when env vars are not yet available during static analysis
+function getRazorpayInstance() {
+  const keyId = process.env.RAZORPAY_KEY_ID
+  const keySecret = process.env.RAZORPAY_KEY_SECRET
+  if (!keyId || !keySecret) {
+    throw new Error('Razorpay keys are not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in environment variables.')
+  }
+  return new Razorpay({ key_id: keyId, key_secret: keySecret })
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,7 +87,8 @@ export async function POST(request: NextRequest) {
       orderId = existingPendingPayment.razorpayOrderId
       existingOrder = true
     } else {
-      // Create a new Razorpay order
+      // Create a new Razorpay order (lazy init to avoid build-time crash)
+      const razorpay = getRazorpayInstance()
       const order = await razorpay.orders.create({
         amount: amountInPaise,
         currency: 'INR',

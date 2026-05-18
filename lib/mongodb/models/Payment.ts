@@ -86,8 +86,8 @@ const PaymentSchema = new Schema({
 PaymentSchema.index({ userId: 1 })
 PaymentSchema.index({ paidByUserId: 1 })
 PaymentSchema.index({ familyCode: 1 })
-PaymentSchema.index({ razorpayOrderId: 1 })
-PaymentSchema.index({ razorpayPaymentId: 1 })
 PaymentSchema.index({ status: 1 })
+// Note: razorpayOrderId and razorpayPaymentId already have indexes
+// from unique:true and sparse:true in the schema field definitions
 
 export default mongoose.models.Payment || mongoose.model<IPayment>('Payment', PaymentSchema)
