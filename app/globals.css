@@ -8,6 +8,46 @@
   }
 }
 
+/* ===== RESPONSIVE FOUNDATION ===== */
+
+/* Prevent accidental horizontal scroll on all pages */
+html,
+body {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Smooth scroll for anchor links (respects user preferences) */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Minimum touch-target utility — 44x44px per WCAG 2.5.5 */
+@layer utilities {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Ensure images and media never overflow their container */
+img,
+video,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Prevent long words/URLs from breaking layouts on mobile */
+@layer base {
+  h1, h2, h3, h4, h5, h6, p, a, span, li, td, th, label {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

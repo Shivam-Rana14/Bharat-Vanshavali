@@ -248,7 +248,7 @@ export function PaymentModal({ open, onClose, member, onPaymentSuccess }: Paymen
           <Button
             variant="outline"
             onClick={onClose}
-            className="flex-1"
+            className="flex-1 touch-target"
             disabled={isLoading}
           >
             <X className="w-4 h-4 mr-1" />
@@ -256,7 +256,7 @@ export function PaymentModal({ open, onClose, member, onPaymentSuccess }: Paymen
           </Button>
           <Button
             onClick={handlePayment}
-            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white touch-target"
             disabled={isLoading || !isScriptLoaded}
           >
             {isLoading ? (

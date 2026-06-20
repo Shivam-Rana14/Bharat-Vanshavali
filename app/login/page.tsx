@@ -161,11 +161,11 @@ export default function LoginPage() {
             <CardContent>
               <Tabs value={loginType} onValueChange={setLoginType} className="mb-6">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="citizen" className="flex items-center space-x-2">
+                  <TabsTrigger value="citizen" className="flex items-center space-x-2 py-3 touch-target">
                     <User className="w-4 h-4" />
                     <span>Citizen</span>
                   </TabsTrigger>
-                  <TabsTrigger value="admin" className="flex items-center space-x-2">
+                  <TabsTrigger value="admin" className="flex items-center space-x-2 py-3 touch-target">
                     <Shield className="w-4 h-4" />
                     <span>Admin</span>
                   </TabsTrigger>

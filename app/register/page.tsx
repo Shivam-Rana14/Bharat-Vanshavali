@@ -478,30 +478,30 @@ export default function RegisterPage() {
           </div>
 
           {/* Progress Bar */}
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             <div className="flex items-center justify-between mb-2">
               {[1, 2, 3, 4].map((step) => (
-                <div key={step} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step <= currentStep
+                <div key={step} className="flex items-center flex-1 last:flex-none">
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium shrink-0 ${step <= currentStep
                     ? 'bg-gradient-to-r from-orange-500 to-green-600 text-white'
                     : 'bg-gray-200 text-gray-600'
                     }`}>
-                    {step < currentStep ? <CheckCircle className="w-5 h-5" /> : step}
+                    {step < currentStep ? <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" /> : step}
                   </div>
                   {step < 4 && (
-                    <div className={`w-16 h-1 mx-2 ${step < currentStep ? 'bg-gradient-to-r from-orange-500 to-green-600' : 'bg-gray-200'
+                    <div className={`flex-1 h-1 mx-1 sm:mx-2 ${step < currentStep ? 'bg-gradient-to-r from-orange-500 to-green-600' : 'bg-gray-200'
                       }`} />
                   )}
                 </div>
               ))}
             </div>
-            <div className="text-center text-sm text-gray-600">
+            <div className="text-center text-xs sm:text-sm text-gray-600">
               Step {currentStep} of {totalSteps}
             </div>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             {/* Step 1: Personal Details */}
             {currentStep === 1 && (
               <div className="space-y-6">
@@ -950,7 +950,7 @@ export default function RegisterPage() {
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between pt-6">
+            <div className="flex justify-between pt-4 sm:pt-6 pb-4">
               <Button
                 type="button"
                 variant="outline"

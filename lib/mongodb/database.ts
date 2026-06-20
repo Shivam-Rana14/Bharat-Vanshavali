@@ -1,3 +1,4 @@
+import mongoose from 'mongoose'
 import connectDB from './connection'
 import { User, FamilyTree, FamilyTreeNode, FamilyTreeConnection, FamilyMembersByFamily, Notification, UserReference } from './models'
 import ActivityLog from './models/ActivityLog'
@@ -774,7 +775,7 @@ export const databaseService = {
 
     // Get nodes instead of FamilyMembers
     const nodes = await FamilyTreeNode.find({ familyTreeId: tree._id })
-      .populate('userId', 'fullName email loginId phone')
+      .populate('userId', 'fullName email loginId phone verificationStatus paymentStatus')
       .sort({ createdAt: -1 })
       .lean()
 
@@ -823,123 +824,130 @@ export const databaseService = {
 
   async addFamilyMemberWithRelationship(memberData: any, userId: string, targetMemberId?: string) {
     await connectDB()
+    const session = await mongoose.startSession()
+    session.startTransaction()
 
-    const familyTree = await FamilyTree.findById(memberData.familyTreeId)
-    if (!familyTree) throw new Error('Family tree not found')
+    try {
+      const familyTree = await FamilyTree.findById(memberData.familyTreeId).session(session)
+      if (!familyTree) throw new Error('Family tree not found')
 
-    // If targetMemberId is provided, create smart relationship
-    let relationshipToTarget = memberData.relationship
-    if (targetMemberId) {
-      // No need to find target member - relationships are now handled via connections
-    }
+      // 1. Generate Login ID
+      let loginId: string
+      let loginIdAttempts = 0
+      const maxLoginIdAttempts = 5
 
-    // 1. Generate Login ID
-    let loginId: string
-    let loginIdAttempts = 0
-    const maxLoginIdAttempts = 5
+      do {
+        loginId = await generateLoginId()
+        const existingLoginId = await User.findOne({ loginId }).session(session)
+        if (!existingLoginId) break
+        loginIdAttempts++
+      } while (loginIdAttempts < maxLoginIdAttempts)
 
-    do {
-      loginId = await generateLoginId()
-      const existingLoginId = await User.findOne({ loginId })
-      if (!existingLoginId) {
-        break
+      if (loginIdAttempts >= maxLoginIdAttempts) {
+        throw new Error('Unable to generate unique Login ID.')
       }
-      loginIdAttempts++
-    } while (loginIdAttempts < maxLoginIdAttempts)
 
-    if (loginIdAttempts >= maxLoginIdAttempts) {
-      throw new Error('Unable to generate unique Login ID.')
-    }
+      // 2. Create Placeholder User
+      const newUser = new User({
+        fullName: memberData.fullName,
+        loginId: loginId,
+        userType: 'citizen',
+        familyCode: familyTree.familyCode,
+        verificationStatus: 'pending',
+        dateOfBirth: memberData.dateOfBirth,
+        placeOfBirth: memberData.placeOfBirth,
+        gender: memberData.gender,
+        nativePlace: memberData.nativePlace,
+        caste: memberData.caste,
+        aadhaarNumber: memberData.aadhaarNumber,
+        panNumber: memberData.panNumber,
+        isPlaceholder: true,
+        managedBy: userId,
+        occupation: memberData.occupation,
+        bio: memberData.bio,
+      })
 
-    // 2. Create Placeholder User
-    const newUser = new User({
-      fullName: memberData.fullName,
-      loginId: loginId,
-      userType: 'citizen',
-      familyCode: familyTree.familyCode,
-      verificationStatus: 'pending',
-      dateOfBirth: memberData.dateOfBirth,
-      placeOfBirth: memberData.placeOfBirth,
-      gender: memberData.gender,
-      nativePlace: memberData.nativePlace,
-      caste: memberData.caste,
-      aadhaarNumber: memberData.aadhaarNumber,
-      panNumber: memberData.panNumber,
-      isPlaceholder: true,
-      managedBy: userId,
-      occupation: memberData.occupation,
-      bio: memberData.bio,
-    })
+      const savedUser = await newUser.save({ session })
 
-    const savedUser = await newUser.save()
-
-    // Create a node for this new member
-    // We need to find a position for the node. 
-    // For now, we'll place it near the target member if exists, or at a default position.
-    let position = { x: 0, y: 0 }
-
-    if (targetMemberId) {
-      // Try to find the target member's node to place this one nearby
-      // Note: targetMemberId passed here is likely a FamilyMember ID, but we need the Node.
-      // However, in the new system, we might be passing Node IDs? 
-      // Let's assume we place it at a default offset for now, and let the UI or layout engine handle it.
-      // Or better, ensureNodesForFamily will create the node if we don't do it here.
-      // But ensureNodesForFamily is usually called on load.
-
-      // Let's explicitly create a node to ensure immediate visibility
-      const nodeCount = await FamilyTreeNode.countDocuments({ familyTreeId: familyTree._id })
-      position = {
-        x: (nodeCount % 5) * 250,
-        y: Math.floor(nodeCount / 5) * 150
+      // Create a node
+      let position = { x: 0, y: 0 }
+      if (targetMemberId) {
+        const nodeCount = await FamilyTreeNode.countDocuments({ familyTreeId: familyTree._id }).session(session)
+        position = {
+          x: (nodeCount % 5) * 250 + (Math.random() * 40 - 20),
+          y: Math.floor(nodeCount / 5) * 150 + 100 + (Math.random() * 40 - 20)
+        }
       }
-    }
 
-    await new FamilyTreeNode({
-      familyTreeId: familyTree._id,
-      userId: savedUser._id,
-      position,
-      nodeData: {
-        width: 200,
-        height: 100,
-        color: COLORS.FAMILY_TREE.REGULAR_MEMBER,
-        isVisible: true
-      }
-    }).save()
-
-    // Recalculate member count from actual data
-    await this.updateFamilyMemberArrays(familyTree.familyCode)
-
-    // Add references if provided (same as signup)
-    if (memberData.reference1Name && memberData.reference1Mobile) {
-      await new UserReference({
+      const savedNode = await new FamilyTreeNode({
+        familyTreeId: familyTree._id,
         userId: savedUser._id,
-        referenceName: memberData.reference1Name,
-        referencePhone: memberData.reference1Mobile,
-        referenceType: 1
-      }).save()
-    }
+        position,
+        nodeData: {
+          width: 200,
+          height: 100,
+          color: COLORS.FAMILY_TREE.REGULAR_MEMBER,
+          isVisible: true
+        }
+      }).save({ session })
 
-    if (memberData.reference2Name && memberData.reference2Mobile) {
-      await new UserReference({
-        userId: savedUser._id,
-        referenceName: memberData.reference2Name,
-        referencePhone: memberData.reference2Mobile,
-        referenceType: 2
-      }).save()
-    }
+      // Create connection
+      if (targetMemberId) {
+        const targetNode = await FamilyTreeNode.findOne({ familyTreeId: familyTree._id, userId: targetMemberId }).session(session)
+        if (targetNode) {
+          await new FamilyTreeConnection({
+            familyTreeId: familyTree._id,
+            sourceNodeId: targetNode._id,
+            targetNodeId: savedNode._id,
+            relationshipType: 'other',
+            relationshipLabel: memberData.relationship || 'Family Member',
+            sourceHandle: 'bottom-source',
+            targetHandle: 'top-target',
+            createdBy: userId || familyTree.rootUserId
+          }).save({ session })
+        }
+      }
 
-    // Create notification for family tree owner
-    if (familyTree.createdBy.toString() !== userId) {
-      await new Notification({
-        userId: familyTree.createdBy,
-        type: 'member_added',
-        title: 'New Family Member Added',
-        message: `A new family member "${memberData.fullName}" has been added to your family tree`,
-        priority: 'medium'
-      }).save()
-    }
+      await session.commitTransaction()
 
-    return { success: true, user: savedUser }
+      // Post-transaction non-critical updates
+      await this.updateFamilyMemberArrays(familyTree.familyCode)
+
+      if (memberData.reference1Name && memberData.reference1Mobile) {
+        await new UserReference({
+          userId: savedUser._id,
+          referenceName: memberData.reference1Name,
+          referencePhone: memberData.reference1Mobile,
+          referenceType: 1
+        }).save()
+      }
+
+      if (memberData.reference2Name && memberData.reference2Mobile) {
+        await new UserReference({
+          userId: savedUser._id,
+          referenceName: memberData.reference2Name,
+          referencePhone: memberData.reference2Mobile,
+          referenceType: 2
+        }).save()
+      }
+
+      if (familyTree.createdBy.toString() !== userId) {
+        await new Notification({
+          userId: familyTree.createdBy,
+          type: 'member_added',
+          title: 'New Family Member Added',
+          message: `A new family member "${memberData.fullName}" has been added to your family tree`,
+          priority: 'medium'
+        }).save()
+      }
+
+      return { success: true, user: savedUser }
+    } catch (error) {
+      await session.abortTransaction()
+      throw error
+    } finally {
+      session.endSession()
+    }
   },
 
   async removeFamilyMember(memberId: string, userId: string) {
@@ -1080,7 +1088,7 @@ export const databaseService = {
 
     console.log(`[getFamilyTreeNodes] Fetching nodes for family tree ID: ${familyTreeId}`)
     const nodes = await FamilyTreeNode.find({ familyTreeId })
-      .populate('userId', 'fullName email loginId phone dateOfBirth gender placeOfBirth verificationStatus occupation bio fatherName motherName spouseName isPlaceholder managedBy')
+      .populate('userId', 'fullName loginId dateOfBirth verificationStatus paymentStatus')
       .lean()
     console.log(`[getFamilyTreeNodes] Found ${nodes.length} nodes`)
     return nodes

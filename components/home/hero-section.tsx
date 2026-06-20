@@ -27,10 +27,11 @@ export function HeroSection() {
     <motion.section
       ref={heroRef}
       style={{ opacity: heroOpacity, scale: heroScale }}
-      className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-green-50 overflow-hidden"
+      className="relative min-h-[calc(100svh-4rem)] flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-green-50 overflow-hidden"
     >
       {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
+      {/* Floating decorative elements — hidden on very small screens to avoid layout noise */}
+      <div className="absolute inset-0 overflow-hidden hidden sm:block">
         <motion.div
           className="absolute top-20 left-10 w-20 h-20 bg-orange-200 rounded-full opacity-20"
           animate={{
@@ -91,7 +92,7 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.2 }}
-          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight"
+          className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight px-2"
         >
           <span className="text-gray-900">भारत वंशावली</span>
           <br />
@@ -104,7 +105,7 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.4 }}
-          className="text-xl sm:text-2xl md:text-3xl mb-8 text-gray-600 max-w-4xl mx-auto"
+          className="text-lg sm:text-xl md:text-2xl lg:text-3xl mb-6 sm:mb-8 text-gray-600 max-w-4xl mx-auto px-2"
         >
           India's First Open Genealogy Platform
           <br />

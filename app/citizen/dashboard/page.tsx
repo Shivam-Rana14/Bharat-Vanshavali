@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import useSWR, { mutate } from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,11 +23,32 @@ export default function CitizenDashboard() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
   const { toast } = useToast()
-  // State for family members data (declare early to keep hook order stable)
-  const [familyMembers, setFamilyMembers] = useState<any[]>([])
-  const [loadingMembers, setLoadingMembers] = useState(true)
-  const [isRootMember, setIsRootMember] = useState(false)
-  const [rootUserId, setRootUserId] = useState<string | null>(null)
+  // Fetch family members from API (using SWR)
+  const fetcher = (url: string) => fetch(url, { cache: 'no-store' }).then(res => res.json())
+  const { data: nodesData, error: nodesError, isLoading: nodesLoading, mutate: mutateNodes } = useSWR(
+    user?.familyCode ? `/api/family-tree/nodes?familyCode=${user.familyCode}` : null,
+    fetcher,
+    { refreshInterval: 60000 }
+  )
+
+  const familyMembers = useMemo(() => {
+    if (!nodesData?.success) return []
+    return nodesData.nodes.map((node: any) => ({
+      id: node.id,
+      userId: node.data.user?._id,
+      name: node.data.user?.fullName || 'Unknown',
+      relation: node.data.user?.loginId === (user as any).loginId ? 'Self' : 'Family Member',
+      loginId: node.data.user?.loginId || 'N/A',
+      status: node.data.user?.verificationStatus || 'pending',
+      paymentStatus: node.data.user?.paymentStatus || 'pending',
+      dateOfBirth: node.data.user?.dateOfBirth,
+      isRoot: node.data.user?._id === nodesData.familyTree.rootUserId
+    }))
+  }, [nodesData, user])
+
+  const loadingMembers = nodesLoading || (!!user?.familyCode && !nodesData && !nodesError)
+  const rootUserId = nodesData?.familyTree?.rootUserId || null
+  const isRootMember = user?.id === rootUserId
 
   // Join Family State
   const [isValidating, setIsValidating] = useState(false)
@@ -82,89 +104,6 @@ export default function CitizenDashboard() {
       setIsValidating(false)
     }
   }
-
-  // Fetch family members from API (using new node-based system)
-  useEffect(() => {
-    const fetchFamilyMembers = async () => {
-      if (!user?.familyCode) return
-
-      try {
-        setLoadingMembers(true)
-        const response = await fetch(`/api/family-tree/nodes?familyCode=${user.familyCode}`)
-
-        if (response.ok) {
-          const data = await response.json()
-
-          if (data.success) {
-            // Transform nodes to match the expected format
-            const members = data.nodes.map((node: any) => ({
-              id: node.id,
-              userId: node.data.user?._id,
-              name: node.data.user?.fullName || 'Unknown',
-              relation: node.data.user?.loginId === (user as any).loginId ? 'Self' : 'Family Member',
-              loginId: node.data.user?.loginId || 'N/A',
-              status: node.data.user?.verificationStatus || 'pending',
-              paymentStatus: node.data.user?.paymentStatus || 'pending',
-              dateOfBirth: node.data.user?.dateOfBirth,
-              isRoot: node.data.user?._id === data.familyTree.rootUserId
-            }))
-            setFamilyMembers(members)
-            setRootUserId(data.familyTree.rootUserId)
-            // Check if current user is root member
-            setIsRootMember(user.id === data.familyTree.rootUserId)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch family members:', error)
-      } finally {
-        setLoadingMembers(false)
-      }
-    }
-
-    fetchFamilyMembers()
-  }, [user])
-
-  // Auto-refresh dashboard every 60 seconds to show newly joined members
-  useEffect(() => {
-    if (!user?.familyCode) return
-
-    const interval = setInterval(() => {
-      const fetchFamilyMembers = async () => {
-        if (!user?.familyCode) return
-
-        try {
-          const response = await fetch(`/api/family-tree/nodes?familyCode=${user.familyCode}`)
-
-          if (response.ok) {
-            const data = await response.json()
-
-            if (data.success) {
-              const members = data.nodes.map((node: any) => ({
-                id: node.id,
-                userId: node.data.user?._id,
-                name: node.data.user?.fullName || 'Unknown',
-                relation: node.data.user?.loginId === (user as any).loginId ? 'Self' : 'Family Member',
-                loginId: node.data.user?.loginId || 'N/A',
-                status: node.data.user?.verificationStatus || 'pending',
-                paymentStatus: node.data.user?.paymentStatus || 'pending',
-                dateOfBirth: node.data.user?.dateOfBirth,
-                isRoot: node.data.user?._id === data.familyTree.rootUserId
-              }))
-              setFamilyMembers(members)
-              // Update root member status
-              setIsRootMember(user.id === data.familyTree.rootUserId)
-            }
-          }
-        } catch (error) {
-          console.error('Auto-refresh failed:', error)
-        }
-      }
-
-      fetchFamilyMembers()
-    }, 60000) // Refresh every 60 seconds
-
-    return () => clearInterval(interval)
-  }, [user])
 
   useEffect(() => {
     // Don't redirect while auth is still loading
@@ -242,27 +181,9 @@ export default function CitizenDashboard() {
           setJoinCode("")
           setValidationResult(null)
           setSelectedRelationship("")
-          // Refresh family members using new node-based API
+          // Refresh family members using SWR mutate
           if (user?.familyCode) {
-            const response = await fetch(`/api/family-tree/nodes?familyCode=${user.familyCode}`)
-            if (response.ok) {
-              const data = await response.json()
-              if (data.success) {
-                const members = data.nodes.map((node: any) => ({
-                  id: node.id,
-                  userId: node.data.user?._id,
-                  name: node.data.user?.fullName || 'Unknown',
-                  relation: node.data.user?.loginId === (user as any).loginId ? 'Self' : 'Family Member',
-                  loginId: node.data.user?.loginId || 'N/A',
-                  status: node.data.user?.verificationStatus || 'pending',
-                  dateOfBirth: node.data.user?.dateOfBirth,
-                  isRoot: node.data.user?._id === data.familyTree.rootUserId
-                }))
-                setFamilyMembers(members)
-                // Update root member status
-                setIsRootMember(user.id === data.familyTree.rootUserId)
-              }
-            }
+            mutateNodes()
           }
         }
       } else {
@@ -346,22 +267,8 @@ export default function CitizenDashboard() {
         setEditFormData({})
 
         // Refresh family members list
-        const refreshResponse = await fetch(`/api/family-tree/nodes?familyCode=${user.familyCode}`)
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          if (refreshData.success) {
-            const members = refreshData.nodes.map((node: any) => ({
-              id: node.id,
-              userId: node.data.user?._id,
-              name: node.data.user?.fullName || 'Unknown',
-              relation: node.data.user?.loginId === (user as any).loginId ? 'Self' : 'Family Member',
-              loginId: node.data.user?.loginId || 'N/A',
-              status: node.data.user?.verificationStatus || 'pending',
-              dateOfBirth: node.data.user?.dateOfBirth,
-              isRoot: node.data.user?._id === refreshData.familyTree.rootUserId
-            }))
-            setFamilyMembers(members)
-          }
+        if (user?.familyCode) {
+          mutateNodes()
         }
       } else {
         toast({
@@ -388,23 +295,21 @@ export default function CitizenDashboard() {
         {/* Header Section */}
         <div className="bg-white border-b">
           <div className="container mx-auto px-4 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                  <User className="w-6 h-6 text-orange-600" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Welcome, {user?.name || 'User'}</h1>
-                  <p className="text-gray-600">ID: {user?.id || 'Loading...'}</p>
-                </div>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
+                <User className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Welcome, {user?.name || 'User'}</h1>
+                <p className="text-sm sm:text-base text-gray-600 truncate">ID: {user?.id || 'Loading...'}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-4 sm:py-8">
           {/* Quick Stats */}
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 mb-6 sm:mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Family Members</CardTitle>
@@ -545,7 +450,7 @@ export default function CitizenDashboard() {
           </Card>
 
           {/* Action Buttons */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Link href="/citizen/family-tree">
               <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardHeader className="text-center">
@@ -592,68 +497,71 @@ export default function CitizenDashboard() {
                   </div>
                 ) : (
                   familyMembers.map((member, index) => (
-                    <div key={member.id || `member-${index}`} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold">{member.name}</h4>
-                            <p className="text-sm text-gray-600">{member.relation}</p>
-                            <p className="text-xs text-gray-500">ID: {member.loginId}</p>
-                            {member.dateOfBirth && (
-                              <p className="text-xs text-gray-500">DOB: {member.dateOfBirth}</p>
-                            )}
+                    <div key={member.id || `member-${index}`} className="p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                      {/* Top row: avatar + member info + badge */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shrink-0">
+                          <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h4 className="font-semibold truncate">{member.name}</h4>
+                              <p className="text-sm text-gray-600">{member.relation}</p>
+                              <p className="text-xs text-gray-500 truncate">ID: {member.loginId}</p>
+                              {member.dateOfBirth && (
+                                <p className="text-xs text-gray-500">DOB: {member.dateOfBirth}</p>
+                              )}
+                            </div>
+                            {/* Status Badge — always visible */}
+                            <div className="shrink-0">
+                              {member.status === 'verified' ? (
+                                <Badge className="bg-green-100 text-green-800 whitespace-nowrap">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              ) : member.paymentStatus === 'paid' ? (
+                                <Badge className="bg-blue-100 text-blue-800 whitespace-nowrap">
+                                  <CreditCard className="w-3 h-3 mr-1" />
+                                  In Progress
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-orange-100 text-orange-800 whitespace-nowrap">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Pending
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {/* Verification / Payment Status Badge */}
-                        {member.status === 'verified' ? (
-                          <Badge className="bg-green-100 text-green-800">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Verified
-                          </Badge>
-                        ) : member.paymentStatus === 'paid' ? (
-                          <Badge className="bg-blue-100 text-blue-800">
-                            <CreditCard className="w-3 h-3 mr-1" />
-                            In Progress
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-orange-100 text-orange-800">
-                            <Clock className="w-3 h-3 mr-1" />
-                            Pending
-                          </Badge>
-                        )}
-
-                        {/* Activate button — root only, only for unpaid & unverified members */}
-                        {isRootMember && member.status !== 'verified' && member.paymentStatus !== 'paid' && (
-                          <Button
-                            size="sm"
-                            className="bg-orange-500 hover:bg-orange-600 text-white"
-                            onClick={() => {
-                              setPaymentMember(member)
-                              setPaymentModalOpen(true)
-                            }}
-                          >
-                            <Zap className="w-3 h-3 mr-1" />
-                            Activate
-                          </Button>
-                        )}
-
-                        {/* Edit button — root only */}
-                        {isRootMember && (
+                      {/* Action buttons row — stacked below on mobile */}
+                      {isRootMember && (
+                        <div className="flex items-center gap-2 mt-3 ml-0 sm:ml-[52px] flex-wrap">
+                          {member.status !== 'verified' && member.paymentStatus !== 'paid' && (
+                            <Button
+                              size="sm"
+                              className="bg-orange-500 hover:bg-orange-600 text-white touch-target text-xs sm:text-sm"
+                              onClick={() => {
+                                setPaymentMember(member)
+                                setPaymentModalOpen(true)
+                              }}
+                            >
+                              <Zap className="w-3 h-3 mr-1" />
+                              Activate
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
+                            className="touch-target text-xs sm:text-sm"
                             onClick={() => handleEditMember(member)}
                           >
                             <Edit className="w-4 h-4 mr-1" />
                             Edit
                           </Button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -664,7 +572,7 @@ export default function CitizenDashboard() {
 
         {/* Edit Member Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100%-2rem)] max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Member Details</DialogTitle>
               <DialogDescription>
@@ -677,7 +585,7 @@ export default function CitizenDashboard() {
               <div className="space-y-4">
                 <h3 className="font-semibold text-sm text-gray-700">Basic Information</h3>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="fullName">Full Name *</Label>
                     <Input
@@ -698,7 +606,7 @@ export default function CitizenDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="placeOfBirth">Place of Birth</Label>
                     <Input
@@ -726,7 +634,7 @@ export default function CitizenDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="nativePlace">Native Place</Label>
                     <Input
@@ -751,7 +659,7 @@ export default function CitizenDashboard() {
               <div className="space-y-4">
                 <h3 className="font-semibold text-sm text-gray-700">Family Relations</h3>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="fatherName">Father's Name</Label>
                     <Input
@@ -773,7 +681,7 @@ export default function CitizenDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="grandfatherName">Grandfather's Name</Label>
                     <Input
@@ -825,7 +733,7 @@ export default function CitizenDashboard() {
               <div className="space-y-4">
                 <h3 className="font-semibold text-sm text-gray-700">Document Numbers</h3>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="aadhaarNumber">Aadhaar Number</Label>
                     <Input
@@ -895,14 +803,18 @@ export default function CitizenDashboard() {
               isRoot: paymentMember.isRoot
             }}
             onPaymentSuccess={(paidUserId) => {
-              // Update local state to show "In Progress" badge immediately
-              setFamilyMembers(prev =>
-                prev.map(m =>
-                  m.userId === paidUserId
-                    ? { ...m, paymentStatus: 'paid' }
-                    : m
-                )
-              )
+              // Optimistic update
+              mutateNodes((currentData: any) => {
+                if (!currentData) return currentData
+                return {
+                  ...currentData,
+                  nodes: currentData.nodes.map((n: any) => 
+                    n.data.user?._id === paidUserId 
+                      ? { ...n, data: { ...n.data, user: { ...n.data.user, paymentStatus: 'paid' } } }
+                      : n
+                  )
+                }
+              }, false) // revalidate = false so the UI updates instantly
             }}
           />
         )}

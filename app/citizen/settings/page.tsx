@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import useSWR from 'swr'
 import { Navbar } from '@/components/layout/navbar'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
@@ -54,49 +55,42 @@ export default function CitizenSettingsPage() {
     loginId: '',
   })
 
+  const fetcher = (url: string) => fetch(url).then(res => res.json())
+  const { data: profileData, error: profileError, isLoading: profileLoading, mutate: mutateProfile } = useSWR('/api/profile', fetcher)
+
   useEffect(() => {
     if (!user) {
       router.push('/login')
       return
     }
-    fetchProfile()
-  }, [user])
 
-  const fetchProfile = async () => {
-    try {
-      setLoading(true)
-      const res = await fetch('/api/profile', { cache: 'no-store' })
-      const data = await res.json()
-      if (data.success && data.data) {
-        const p = data.data
-        setFormData({
-          fullName: p.fullName || '',
-          email: p.email || '',
-          phone: p.phone || '',
-          loginId: p.loginId || '',
-          dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth).toISOString().split('T')[0] : '',
-          placeOfBirth: p.placeOfBirth || '',
-          gender: p.gender || '',
-          nativePlace: p.nativePlace || '',
-          caste: p.caste || '',
-          occupation: p.occupation || '',
-          bio: p.bio || '',
-          fatherName: p.fatherName || '',
-          motherName: p.motherName || '',
-          grandfatherName: p.grandfatherName || '',
-          spouseName: p.spouseName || '',
-          aadhaarNumber: p.aadhaarNumber || '',
-          panNumber: p.panNumber || '',
-          familyCode: p.familyCode || '',
-          verificationStatus: p.verificationStatus || 'pending',
-        })
-      }
-    } catch (e) {
+    if (profileData?.success && profileData.data) {
+      const p = profileData.data
+      setFormData({
+        fullName: p.fullName || '',
+        email: p.email || '',
+        phone: p.phone || '',
+        loginId: p.loginId || '',
+        dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth).toISOString().split('T')[0] : '',
+        placeOfBirth: p.placeOfBirth || '',
+        gender: p.gender || '',
+        nativePlace: p.nativePlace || '',
+        caste: p.caste || '',
+        occupation: p.occupation || '',
+        bio: p.bio || '',
+        fatherName: p.fatherName || '',
+        motherName: p.motherName || '',
+        grandfatherName: p.grandfatherName || '',
+        spouseName: p.spouseName || '',
+        aadhaarNumber: p.aadhaarNumber || '',
+        panNumber: p.panNumber || '',
+        familyCode: p.familyCode || '',
+        verificationStatus: p.verificationStatus || 'pending',
+      })
+    } else if (profileError) {
       toast({ title: 'Error', description: 'Failed to load profile', variant: 'destructive' })
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [user, router, profileData, profileError, toast])
 
   const handleSave = async () => {
     if (!formData.fullName.trim()) {
@@ -129,6 +123,7 @@ export default function CitizenSettingsPage() {
       const data = await res.json()
       if (data.success) {
         toast({ title: '✅ Profile Updated', description: 'Your profile has been saved successfully.' })
+        mutateProfile()
       } else {
         throw new Error(data.error)
       }
@@ -173,7 +168,7 @@ export default function CitizenSettingsPage() {
     </div>
   )
 
-  if (loading) {
+  if (profileLoading && !profileData) {
     return (
       <>
         <Navbar />

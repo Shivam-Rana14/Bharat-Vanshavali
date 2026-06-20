@@ -226,7 +226,7 @@ function AdminDashboardContent() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
         <div className="container mx-auto px-4 py-8">
           {/* Stats Cards */}
-          <div className="grid md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Pending Verifications</CardTitle>
@@ -273,10 +273,10 @@ function AdminDashboardContent() {
             setActiveTab(val)
             router.replace(`/admin/dashboard?tab=${val}`, { scroll: false })
           }}>
-            <TabsList className="grid w-full grid-cols-3 max-w-2xl">
-              <TabsTrigger value="pending">Pending Verifications</TabsTrigger>
-              <TabsTrigger value="verified">Verified Citizens</TabsTrigger>
-              <TabsTrigger value="families">Families</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 max-w-2xl h-auto">
+              <TabsTrigger value="pending" className="text-xs sm:text-sm py-2.5 touch-target">Pending</TabsTrigger>
+              <TabsTrigger value="verified" className="text-xs sm:text-sm py-2.5 touch-target">Verified</TabsTrigger>
+              <TabsTrigger value="families" className="text-xs sm:text-sm py-2.5 touch-target">Families</TabsTrigger>
             </TabsList>
 
             {/* Pending Tab */}
@@ -291,11 +291,11 @@ function AdminDashboardContent() {
                 ) : (
                   pendingUsers.map((user) => (
                     <Card key={user._id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-lg">{user.fullName}</CardTitle>
-                            <CardDescription>Login ID: {user.loginId}</CardDescription>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <CardTitle className="text-base sm:text-lg truncate">{user.fullName}</CardTitle>
+                            <CardDescription className="truncate">Login ID: {user.loginId}</CardDescription>
                           </div>
                           <Badge variant="outline" className="text-orange-600 border-orange-200">
                             <Clock className="w-3 h-3 mr-1" />
@@ -304,7 +304,7 @@ function AdminDashboardContent() {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 mb-4 text-sm">
                           <div>
                             <p className="text-sm text-gray-600">Father: {user.fatherName || 'N/A'}</p>
                             <p className="text-sm text-gray-600">Mother: {user.motherName || 'N/A'}</p>
@@ -316,12 +316,12 @@ function AdminDashboardContent() {
                             <p className="text-sm text-gray-600">Family Code: {user.familyCode || 'N/A'}</p>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             onClick={() => handleViewDetails(user)}
                             variant="outline"
                             size="sm"
-                            className="flex items-center space-x-1"
+                            className="flex items-center space-x-1 touch-target"
                           >
                             <Eye className="w-4 h-4" />
                             <span>View Details</span>
@@ -385,7 +385,7 @@ function AdminDashboardContent() {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 mb-4 text-sm">
                           <div>
                             <p className="text-sm text-gray-600">Father: {user.fatherName || 'N/A'}</p>
                             <p className="text-sm text-gray-600">Mother: {user.motherName || 'N/A'}</p>
@@ -469,8 +469,8 @@ function AdminDashboardContent() {
 
           {/* User Details Modal */}
           {selectedUser && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-              <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4 z-[60]">
+              <Card className="w-full max-w-4xl max-h-[85vh] overflow-y-auto">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>User Details - {selectedUser.fullName}</CardTitle>
@@ -495,7 +495,7 @@ function AdminDashboardContent() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-3">
                       <h4 className="font-semibold text-lg mb-3">Personal Information</h4>
                       <div><strong>Login ID:</strong> {selectedUser.loginId}</div>

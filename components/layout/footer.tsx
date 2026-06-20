@@ -74,7 +74,7 @@ export function Footer() {
                 <motion.a
                   key={index}
                   href="#"
-                  className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center hover:bg-orange-600 transition-colors"
+                  className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-orange-600 transition-colors touch-target"
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -102,7 +102,7 @@ export function Footer() {
                   >
                     <Link 
                       href={link.href} 
-                      className="text-gray-400 hover:text-white transition-colors duration-300 text-xs md:text-sm flex items-center space-x-2"
+                      className="text-gray-400 hover:text-white transition-colors duration-300 text-xs md:text-sm flex items-center space-x-2 py-1.5"
                     >
                       {link.icon && <link.icon className="w-4 h-4" />}
                       <span>{link.name}</span>

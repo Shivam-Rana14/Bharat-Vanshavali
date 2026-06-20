@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -51,38 +52,15 @@ export default function ProfilePage() {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-  const [loading, setLoading] = useState(true)
-  const [profileData, setProfileData] = useState<UserProfile | null>(null)
+  const fetcher = (url: string) => fetch(url).then(res => res.json())
+  const { data: authData, error, isLoading: profileLoading } = useSWR('/api/auth/me', fetcher)
+  const profileData = authData?.user || null
 
   useEffect(() => {
     if (!user) {
       router.push('/login')
-      return
     }
-    fetchProfileData()
-  }, [user])
-
-  const fetchProfileData = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.user) {
-          setProfileData(data.user)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch profile:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load profile data.",
-        variant: "destructive"
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [user, router])
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not provided'
@@ -95,7 +73,7 @@ export default function ProfilePage() {
 
 
 
-  if (loading) {
+  if (profileLoading && !profileData) {
     return (
       <>
         <Navbar />
@@ -152,8 +130,8 @@ export default function ProfilePage() {
                         )}
                       </div>
                       <div>
-                        <CardTitle className="text-2xl">{profileData.fullName}</CardTitle>
-                        <CardDescription className="flex items-center space-x-2 mt-1">
+                        <CardTitle className="text-xl sm:text-2xl break-words">{profileData.fullName}</CardTitle>
+                        <CardDescription className="flex items-center space-x-2 mt-2 sm:mt-1">
                           <Badge variant={profileData.verificationStatus === 'verified' ? 'default' : 'secondary'}
                             className={profileData.verificationStatus === 'verified'
                               ? 'bg-green-100 text-green-800'
@@ -363,7 +341,7 @@ export default function ProfilePage() {
                 <CardContent className="space-y-2">
                   <Button
                     variant="outline"
-                    className="w-full justify-start"
+                    className="w-full justify-start touch-target"
                     onClick={() => router.push('/citizen/settings')}
                   >
                     <Edit className="w-4 h-4 mr-2" />
@@ -371,7 +349,7 @@ export default function ProfilePage() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full justify-start"
+                    className="w-full justify-start touch-target"
                     onClick={() => router.push('/citizen/family-tree')}
                   >
                     <User className="w-4 h-4 mr-2" />

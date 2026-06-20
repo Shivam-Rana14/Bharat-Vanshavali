@@ -12,6 +12,7 @@ import { Navbar } from "@/components/layout/navbar"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { LocationInput } from "@/components/ui/location-input"
+import { mutate } from "swr"
 
 export default function AddMemberPage() {
   const [formData, setFormData] = useState({
@@ -155,6 +156,13 @@ export default function AddMemberPage() {
 
         if (response.ok) {
           const data = await response.json()
+          
+          // Invalidate cache immediately so the dashboard and family tree show the new member instantly
+          if (user?.familyCode) {
+            mutate(`/api/family-tree/nodes?familyCode=${user.familyCode}`)
+            mutate(`/api/family-tree/nodes?familyCode=${user.familyCode}&t=`) // Bust any legacy keys
+          }
+
           toast({
             title: "Family Member Added",
             description: `${formData.fullName} has been added to your family tree. You can now connect them in the family tree view.`,
@@ -430,7 +438,7 @@ export default function AddMemberPage() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-orange-500 to-green-600 hover:from-orange-600 hover:to-green-700"
+                  className="w-full bg-gradient-to-r from-orange-500 to-green-600 hover:from-orange-600 hover:to-green-700 touch-target py-3"
                   disabled={loading}
                 >
                   {loading ? (

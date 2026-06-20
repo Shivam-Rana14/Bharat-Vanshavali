@@ -17,6 +17,7 @@ import {
   type EdgeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import useSWR from 'swr'
 
 // Custom styles for better handle visibility and functionality
 const customStyles = `
@@ -199,17 +200,64 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
     }
   ]
 
-  // Load family tree data
+  const fetcher = (url: string) => fetch(url, { cache: 'no-store' }).then(res => res.json())
+  const { data: treeData, error, mutate: mutateTree } = useSWR(
+    `/api/family-tree/nodes?familyCode=${familyCode}`,
+    fetcher,
+    { refreshInterval: 60000 }
+  )
+
+  // Load family tree data and safely merge to prevent root node drop
   useEffect(() => {
-    fetchFamilyTreeData()
-  }, [familyCode])
+    if (treeData && treeData.success) {
+      const nodeCount = treeData.nodes?.length || 0
+      const familyMemberCount = treeData.familyTree?.memberCount || 0
+
+      if (lastNodeCount > 0 && nodeCount > lastNodeCount) {
+        const newMemberCount = nodeCount - lastNodeCount
+        toast({
+          title: "New Family Members!",
+          description: `${newMemberCount} new member(s) have joined your family tree.`,
+          variant: "default"
+        })
+      }
+      setLastNodeCount(nodeCount)
+      setFamilyTree(treeData.familyTree)
+
+      // Safely merge nodes to prevent React Flow from dropping the Root Node during sync
+      setNodes((currentNodes) => {
+        if (!currentNodes.length) return treeData.nodes
+        
+        const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]))
+        return treeData.nodes.map((serverNode: any) => {
+          const localNode = currentNodesMap.get(serverNode.id)
+          if (localNode) {
+            // Preserve local UI state (dragging position, selected state)
+            return {
+              ...serverNode,
+              position: localNode.position || serverNode.position,
+              selected: localNode.selected,
+            }
+          }
+          return serverNode
+        })
+      })
+      setEdges(treeData.edges)
+      setLoading(false)
+    } else if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load family tree data.",
+        variant: "destructive"
+      })
+      setLoading(false)
+    }
+  }, [treeData, error, setNodes, setEdges, toast, lastNodeCount])
 
   // Function to ensure nodes exist for all family members
   const ensureNodesForFamily = async () => {
     try {
       setEnsuringNodes(true)
-      console.log('Ensuring nodes for family:', familyCode)
-
       const response = await fetch('/api/family-tree/ensure-nodes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -224,14 +272,11 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
           description: `${result.created || 0} missing nodes created. ${result.cleaned || 0} duplicate nodes removed.`,
           variant: "default"
         })
-
-        // Refresh the tree to show new nodes
-        await fetchFamilyTreeData(false)
+        mutateTree()
       } else {
         throw new Error(result.error || 'Failed to ensure nodes')
       }
     } catch (error) {
-      console.error('Error ensuring nodes:', error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to ensure nodes for family members.",
@@ -239,77 +284,6 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
       })
     } finally {
       setEnsuringNodes(false)
-    }
-  }
-
-
-  const fetchFamilyTreeData = async (autoEnsureNodes = false) => {
-    try {
-      setLoading(true)
-      console.log(`Fetching family tree data for family code: ${familyCode}`)
-      const response = await fetch(`/api/family-tree/nodes?familyCode=${familyCode}&t=${Date.now()}`, {
-        cache: 'no-cache',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Family tree API response:', data)
-        if (data.success) {
-          console.log(`Received ${data.nodes?.length || 0} nodes and ${data.edges?.length || 0} edges`)
-
-          // Check if we need to ensure nodes for missing family members
-          const nodeCount = data.nodes?.length || 0
-          const familyMemberCount = data.familyTree?.memberCount || 0
-
-          console.log(`Node count: ${nodeCount}, Family member count: ${familyMemberCount}`)
-
-          // Auto-trigger ensureNodes if nodes are missing and we're refreshing
-          if (autoEnsureNodes && nodeCount < familyMemberCount) {
-            console.log('Missing nodes detected, triggering ensureNodesForFamily...')
-            toast({
-              title: "Missing Nodes Detected",
-              description: `Found ${familyMemberCount - nodeCount} missing nodes. Creating them now...`,
-              variant: "default"
-            })
-
-            // Trigger node creation
-            await ensureNodesForFamily()
-
-            // Refetch data after ensuring nodes
-            return fetchFamilyTreeData(false) // Prevent infinite loop
-          }
-
-          // Check if new members joined
-          if (lastNodeCount > 0 && nodeCount > lastNodeCount) {
-            const newMemberCount = nodeCount - lastNodeCount
-            toast({
-              title: "New Family Members!",
-              description: `${newMemberCount} new member(s) have joined your family tree.`,
-              variant: "default"
-            })
-          }
-          setLastNodeCount(nodeCount)
-
-          setFamilyTree(data.familyTree)
-          setNodes(data.nodes)
-          setEdges(data.edges)
-        }
-      } else {
-        throw new Error('Failed to fetch family tree data')
-      }
-    } catch (error) {
-      console.error('Error fetching family tree:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load family tree data.",
-        variant: "destructive"
-      })
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -399,7 +373,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
 
         if (result.success) {
           // Refresh the family tree data to get the real connection with proper ID
-          await fetchFamilyTreeData()
+          mutateTree()
           toast({
             title: "Connection Created",
             description: "Family relationship has been established. Click on the connection line to edit the relationship type.",
@@ -417,7 +391,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
         })
       }
     },
-    [familyTree?.isUserRoot, familyTree?.id, toast, fetchFamilyTreeData]
+    [familyTree?.isUserRoot, familyTree?.id, toast, mutateTree]
   )
 
   const onNodeClick = useCallback(async (event: React.MouseEvent, node: Node) => {
@@ -449,7 +423,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
 
           const result = await response.json()
           if (result.success) {
-            await fetchFamilyTreeData()
+            mutateTree()
             toast({
               title: "Connection Created",
               description: "Family relationship has been established. Click on the connection line to edit the relationship type.",
@@ -475,7 +449,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
       // Regular node selection
       setSelectedNodes([node.id])
     }
-  }, [connectionMode, pendingConnection, familyTree?.isUserRoot, familyTree?.id, toast, fetchFamilyTreeData])
+  }, [connectionMode, pendingConnection, familyTree?.isUserRoot, familyTree?.id, toast, mutateTree])
 
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
     if (!familyTree?.isUserRoot) {
@@ -500,99 +474,77 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
   }, [familyTree?.isUserRoot, toast])
 
   const updateRelationship = async () => {
-    if (!editingEdge.edge || !relationshipLabel.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a relationship label.",
-        variant: "destructive"
-      })
-      return
-    }
+    if (!editingEdge.edge || !relationshipLabel.trim()) return
+
+    const edgeId = editingEdge.edge.id
+    const newLabel = relationshipLabel
+    const newType = relationshipType
 
     try {
-      // Update the edge in the UI immediately
-      setEdges((eds: any) =>
-        eds.map((edge: any) =>
-          edge.id === editingEdge.edge.id
-            ? {
-              ...edge,
-              label: relationshipLabel,
-              data: {
-                ...(edge.data || {}),
-                relationshipType: relationshipType,
-                relationshipLabel: relationshipLabel
-              }
-            }
-            : edge
-        )
-      )
+      // Optimistic UI update in React Flow State
+      setEdges((eds: any) => eds.map((e: any) => e.id === edgeId ? { ...e, label: newLabel, data: { ...e.data, relationshipType: newType, relationshipLabel: newLabel } } : e))
+      
+      // Optimistic SWR Cache Update
+      mutateTree((currentData: any) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          edges: currentData.edges.map((e: any) => e.id === edgeId ? { ...e, label: newLabel, data: { ...e.data, relationshipType: newType, relationshipLabel: newLabel } } : e)
+        }
+      }, false)
 
-      // Update in database
-      const response = await fetch(`/api/family-tree/connections/${editingEdge.edge.id}`, {
+      const response = await fetch(`/api/family-tree/connections/${edgeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          relationshipType,
-          relationshipLabel
-        })
+        body: JSON.stringify({ relationshipType: newType, relationshipLabel: newLabel })
       })
 
-      if (response.ok) {
-        toast({
-          title: "Relationship Updated",
-          description: `Relationship changed to "${relationshipLabel}".`,
-          variant: "default"
-        })
-      } else {
-        throw new Error('Failed to update relationship')
-      }
-
-      // Close dialog
+      if (!response.ok) throw new Error('Failed to update relationship')
+      
       setEditingEdge({ edge: null as any, isOpen: false })
       setRelationshipLabel('')
       setRelationshipType('')
-    } catch (error) {
+      
       toast({
-        title: "Error",
-        description: "Failed to update relationship.",
-        variant: "destructive"
+        title: "Relationship Updated",
+        description: `Relationship changed to "${newLabel}".`,
+        variant: "default"
       })
+    } catch (error) {
+      // Revert cache aggressively on failure
+      mutateTree()
+      toast({ title: "Error", description: "Failed to update relationship.", variant: "destructive" })
     }
   }
 
   const deleteConnection = async () => {
     if (!deletingEdge.edge) return
+    const edgeId = deletingEdge.edge.id
 
     try {
-      // Remove the edge from UI immediately
-      setEdges((eds: any) => eds.filter((edge: any) => edge.id !== deletingEdge.edge.id))
+      // Optimistic UI update in React Flow State
+      setEdges((eds: any) => eds.filter((e: any) => e.id !== edgeId))
 
-      // Delete from database
-      const response = await fetch(`/api/family-tree/connections/${deletingEdge.edge.id}`, {
-        method: 'DELETE'
-      })
+      // Optimistic SWR Cache Update
+      mutateTree((currentData: any) => {
+        if (!currentData) return currentData
+        return { ...currentData, edges: currentData.edges.filter((e: any) => e.id !== edgeId) }
+      }, false)
 
-      if (response.ok) {
-        toast({
-          title: "Connection Deleted",
-          description: "The relationship has been removed from the family tree.",
-          variant: "default"
-        })
-      } else {
-        throw new Error('Failed to delete connection')
-      }
+      const response = await fetch(`/api/family-tree/connections/${edgeId}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Failed to delete connection')
 
-      // Close dialog
       setDeletingEdge({ edge: null as any, isOpen: false })
-    } catch (error) {
-      // Revert the UI change if deletion failed
-      await fetchFamilyTreeData()
+      
       toast({
-        title: "Error",
-        description: "Failed to delete connection.",
-        variant: "destructive"
+        title: "Connection Deleted",
+        description: "The relationship has been removed from the family tree.",
+        variant: "default"
       })
-      setDeletingEdge({ edge: null as any, isOpen: false })
+    } catch (error) {
+      // Revert cache aggressively on failure
+      mutateTree()
+      toast({ title: "Error", description: "Failed to delete connection.", variant: "destructive" })
     }
   }
 
@@ -659,26 +611,25 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <h1 className="text-xl font-bold text-gray-900">
+      <div className="bg-white border-b px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+        <div className="flex items-center space-x-3 w-full sm:w-auto">
+          <h1 className="text-xl font-bold text-gray-900 truncate">
             {familyTree?.name || 'Family Tree'}
           </h1>
           {familyTree?.isUserRoot && (
-            <Badge variant="outline" className="bg-blue-100 text-blue-800">
+            <Badge variant="outline" className="bg-blue-100 text-blue-800 shrink-0 whitespace-nowrap">
               <Crown className="w-3 h-3 mr-1" />
               Root Member
             </Badge>
           )}
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              console.log('Manual refresh triggered with auto-ensure')
-              fetchFamilyTreeData(true) // Enable auto-ensure on manual refresh
+              mutateTree()
             }}
             disabled={loading}
             className="bg-blue-50 hover:bg-blue-100 border-blue-200"

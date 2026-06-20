@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-utils'
 import { databaseService } from '@/lib/mongodb/database'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // GET /api/profile - Fetch the current user's own full profile
 export async function GET(request: NextRequest) {
   try {

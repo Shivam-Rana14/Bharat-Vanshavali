@@ -10,46 +10,6 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { NotificationsModal } from "@/components/ui/notifications-modal"
 
-// Mock notifications data
-const mockNotifications = [
-  {
-    id: "1",
-    type: "verification" as const,
-    title: "Family Member Verified",
-    message: "Priya Kumari has been verified and added to your family tree",
-    timestamp: "2 hours ago",
-    read: false,
-    priority: "high" as const
-  },
-  {
-    id: "2",
-    type: "member_added" as const,
-    title: "New Family Member Added",
-    message: "Arjun Doe has been added to your family tree and is pending verification",
-    timestamp: "1 day ago",
-    read: false,
-    priority: "medium" as const
-  },
-  {
-    id: "3",
-    type: "system" as const,
-    title: "Profile Updated",
-    message: "Your profile information has been successfully updated",
-    timestamp: "3 days ago",
-    read: true,
-    priority: "low" as const
-  },
-  {
-    id: "4",
-    type: "family_update" as const,
-    title: "Family Tree Updated",
-    message: "Your family tree has been updated with new relationship connections",
-    timestamp: "1 week ago",
-    read: true,
-    priority: "medium" as const
-  }
-]
-
 interface NavigationItem {
   name: string
   href: string
@@ -296,15 +256,32 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <motion.button
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </motion.button>
+          {/* Mobile Menu Button — 44px touch target */}
+          <div className="flex items-center gap-2 lg:hidden">
+            {/* Mobile Notification Bell (logged-in users only) */}
+            {user && (
+              <button
+                className="relative p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors touch-target flex items-center justify-center"
+                onClick={handleNotificationClick}
+                aria-label="Notifications"
+              >
+                <Bell className="w-5 h-5 text-gray-700" />
+                {unreadCount > 0 && (
+                  <Badge className="absolute top-0.5 right-0.5 w-5 h-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </button>
+            )}
+            <motion.button
+              className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors touch-target flex items-center justify-center"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              whileTap={{ scale: 0.9 }}
+              aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </motion.button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}
@@ -318,7 +295,7 @@ export function Navbar() {
               className="lg:hidden bg-white border-t"
             >
               <div className="container mx-auto px-4 py-4">
-                <nav className="space-y-4">
+                <nav className="space-y-1">
                   {navigationItems.map((item, index) => (
                     <motion.div
                       key={item.name}
@@ -329,7 +306,7 @@ export function Navbar() {
                       <Link 
                         href={item.href}
                         onClick={() => setIsMenuOpen(false)}
-                        className="flex items-center space-x-3 text-gray-700 hover:text-orange-600 transition-colors duration-300 py-2"
+                        className="flex items-center space-x-3 text-gray-700 hover:text-orange-600 active:bg-orange-50 transition-colors duration-200 py-3 px-3 rounded-lg touch-target"
                       >
                         {item.icon && <item.icon className="w-5 h-5" />}
                         <span className="font-medium">{item.name}</span>
@@ -338,20 +315,34 @@ export function Navbar() {
                   ))}
                 </nav>
 
-                {user && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{user.name}</p>
+                {/* Mobile: Auth actions */}
+                {user ? (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1 mr-3">
+                        <p className="font-medium text-gray-900 truncate">{user.name}</p>
                         <p className="text-sm text-gray-600">
                           {user.type === 'admin' ? 'Admin' : 'Citizen'}
                         </p>
                       </div>
-                      <Button onClick={handleLogout} variant="outline" size="sm">
+                      <Button onClick={handleLogout} variant="outline" size="sm" className="touch-target shrink-0">
                         <LogOut className="w-4 h-4 mr-2" />
                         Logout
                       </Button>
                     </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
+                    <Link href="/login" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="outline" className="w-full touch-target">
+                        Login
+                      </Button>
+                    </Link>
+                    <Link href="/register" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full bg-gradient-to-r from-orange-500 to-green-600 hover:from-orange-600 hover:to-green-700 touch-target">
+                        Join Now
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </div>
@@ -371,6 +362,41 @@ export function Navbar() {
             if (count === 0) setNotifications([])
           }}
         />
+      )}
+      {/* Mobile Bottom Navigation (Logged-in users only) */}
+      {user && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
+          <div className="flex items-center justify-around px-2 py-2">
+            {navigationItems.map((item) => {
+              const Icon = item.icon || User;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className="flex flex-col items-center justify-center space-y-1 w-16 touch-target text-gray-500 hover:text-orange-600 active:text-orange-600 transition-colors"
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-[10px] font-medium truncate w-full text-center px-1">
+                    {item.name === 'Pending Verifications' ? 'Pending' : 
+                     item.name === 'Verified Citizens' ? 'Verified' : 
+                     item.name}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Global spacer to prevent content from hiding behind the bottom nav on mobile */}
+      {user && (
+        <style dangerouslySetInnerHTML={{__html: `
+          @media (max-width: 1023px) {
+            body {
+              padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+            }
+          }
+        `}} />
       )}
     </>
   )

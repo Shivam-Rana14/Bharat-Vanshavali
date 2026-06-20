@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         familyTreeId: familyTree._id.toString()
       },
       user.id,
-      targetMemberId
+      targetMemberId || familyTree.rootUserId.toString()
     )
 
     // Notify the adding user (root/creator) as confirmation
