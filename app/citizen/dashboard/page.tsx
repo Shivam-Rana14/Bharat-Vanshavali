@@ -327,7 +327,7 @@ export default function CitizenDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  {familyMembers.filter(m => m.status === 'verified').length}
+                  {familyMembers.filter((m: any) => m.status === 'verified').length}
                 </div>
               </CardContent>
             </Card>
@@ -339,7 +339,7 @@ export default function CitizenDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-orange-600">
-                  {familyMembers.filter(m => m.status === 'pending').length}
+                  {familyMembers.filter((m: any) => m.status === 'pending').length}
                 </div>
               </CardContent>
             </Card>
