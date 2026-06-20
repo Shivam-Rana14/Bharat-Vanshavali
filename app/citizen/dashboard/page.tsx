@@ -496,7 +496,7 @@ export default function CitizenDashboard() {
                     <p>No family members found. Add your first family member to get started.</p>
                   </div>
                 ) : (
-                  familyMembers.map((member, index) => (
+                  familyMembers.map((member: any, index: number) => (
                     <div key={member.id || `member-${index}`} className="p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                       {/* Top row: avatar + member info + badge */}
                       <div className="flex items-start gap-3">
