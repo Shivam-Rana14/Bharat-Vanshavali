@@ -228,7 +228,7 @@ export default function NodeFamilyTree({ familyCode }: NodeFamilyTreeProps) {
       setNodes((currentNodes) => {
         if (!currentNodes.length) return treeData.nodes
         
-        const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]))
+        const currentNodesMap = new Map(currentNodes.map((n: any) => [n.id, n]))
         return treeData.nodes.map((serverNode: any) => {
           const localNode = currentNodesMap.get(serverNode.id)
           if (localNode) {
