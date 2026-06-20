@@ -11,7 +11,7 @@ export interface IPayment extends Document {
   amount: number           // In paise (10000 = ₹100, 1000 = ₹10)
   amountInRupees: number   // 100 or 10
   currency: string
-  status: 'created' | 'paid' | 'failed'
+  status: 'created' | 'paid' | 'failed' | 'expired'
   memberType: 'root' | 'member'
   paymentMethod?: string   // upi, card, netbanking etc.
   paidAt?: Date
@@ -64,7 +64,7 @@ const PaymentSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['created', 'paid', 'failed'],
+    enum: ['created', 'paid', 'failed', 'expired'],
     default: 'created'
   },
   memberType: {

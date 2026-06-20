@@ -74,50 +74,44 @@ export async function POST(request: NextRequest) {
     const amountInRupees = isTargetRoot ? 100 : 10
     const amountInPaise = amountInRupees * 100
 
-    // Check for existing pending order for this user (so we don't create duplicates)
-    const existingPendingPayment = await Payment.findOne({
-      userId: targetMember._id,
-      status: 'created'
+    // Expire any stale pending orders for this user.
+    // Razorpay sessions expire after ~15 minutes, so reusing old order IDs
+    // causes 401 Unauthorized errors. Always create a fresh order instead.
+    await Payment.updateMany(
+      { userId: targetMember._id, status: 'created' },
+      { status: 'expired' }
+    )
+
+    // Create a new Razorpay order (lazy init to avoid build-time crash)
+    const razorpay = getRazorpayInstance()
+    const order = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: `bv_${targetMember.loginId}_${Date.now()}`,
+      notes: {
+        memberName: targetMember.fullName,
+        memberLoginId: targetMember.loginId,
+        memberType,
+        familyCode: payingUser.familyCode,
+        paidByName: payingUser.fullName,
+        paidByLoginId: payingUser.loginId
+      }
     })
 
-    let orderId: string
-    let existingOrder = false
+    const orderId = order.id
 
-    if (existingPendingPayment) {
-      orderId = existingPendingPayment.razorpayOrderId
-      existingOrder = true
-    } else {
-      // Create a new Razorpay order (lazy init to avoid build-time crash)
-      const razorpay = getRazorpayInstance()
-      const order = await razorpay.orders.create({
-        amount: amountInPaise,
-        currency: 'INR',
-        receipt: `bv_${targetMember.loginId}_${Date.now()}`,
-        notes: {
-          memberName: targetMember.fullName,
-          memberLoginId: targetMember.loginId,
-          memberType,
-          familyCode: payingUser.familyCode,
-          paidByName: payingUser.fullName,
-          paidByLoginId: payingUser.loginId
-        }
-      })
-
-      orderId = order.id
-
-      // Save the order to DB
-      await Payment.create({
-        userId: targetMember._id,
-        paidByUserId: payingUser._id,
-        familyCode: payingUser.familyCode,
-        razorpayOrderId: orderId,
-        amount: amountInPaise,
-        amountInRupees,
-        currency: 'INR',
-        status: 'created',
-        memberType
-      })
-    }
+    // Save the order to DB
+    await Payment.create({
+      userId: targetMember._id,
+      paidByUserId: payingUser._id,
+      familyCode: payingUser.familyCode,
+      razorpayOrderId: orderId,
+      amount: amountInPaise,
+      amountInRupees,
+      currency: 'INR',
+      status: 'created',
+      memberType
+    })
 
     return NextResponse.json({
       success: true,
@@ -130,7 +124,6 @@ export async function POST(request: NextRequest) {
         memberLoginId: targetMember.loginId,
         memberType,
         keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        existingOrder
       }
     })
   } catch (error: any) {
