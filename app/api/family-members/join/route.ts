@@ -4,6 +4,8 @@ import { databaseService } from '@/lib/mongodb/database'
 import { FamilyTree, FamilyTreeNode } from '@/lib/mongodb/models'
 import { COLORS } from '@/lib/constants'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const user = requireAuth(request)

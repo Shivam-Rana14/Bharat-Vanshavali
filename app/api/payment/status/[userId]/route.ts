@@ -3,6 +3,8 @@ import connectDB from '@/lib/mongodb/connection'
 import Payment from '@/lib/mongodb/models/Payment'
 import { getAuthenticatedUser } from '@/lib/api-utils'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { userId: string } }

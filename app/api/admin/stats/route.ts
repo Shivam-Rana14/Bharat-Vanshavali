@@ -4,6 +4,8 @@ import { requireAdmin } from '@/lib/api-utils'
 import connectDB from '@/lib/mongodb/connection'
 import { User } from '@/lib/mongodb/models'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
     try {
         requireAdmin(request)

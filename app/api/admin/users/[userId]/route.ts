@@ -4,6 +4,8 @@ import { databaseService } from '@/lib/mongodb/database'
 import connectDB from '@/lib/mongodb/connection'
 import { User } from '@/lib/mongodb/models'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
     request: NextRequest,
     { params }: { params: { userId: string } }

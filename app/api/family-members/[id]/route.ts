@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/mongodb/database'
 import { requireAuth } from '@/lib/api-utils'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/family-members/[id] - Fetch member details for editing
 export async function GET(
     request: NextRequest,

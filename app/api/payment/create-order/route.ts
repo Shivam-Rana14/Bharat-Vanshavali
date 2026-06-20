@@ -6,6 +6,8 @@ import Payment from '@/lib/mongodb/models/Payment'
 import FamilyTree from '@/lib/mongodb/models/FamilyTree'
 import { getAuthenticatedUser } from '@/lib/api-utils'
 
+export const dynamic = 'force-dynamic'
+
 
 // Lazily initialize Razorpay inside handler to avoid build-time crash
 // when env vars are not yet available during static analysis

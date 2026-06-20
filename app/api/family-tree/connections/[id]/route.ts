@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/mongodb/database'
 import { requireAuth } from '@/lib/api-utils'
 
+export const dynamic = 'force-dynamic'
+
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = requireAuth(request)

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/mongodb/database'
 import { requireAdmin } from '@/lib/api-utils'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     requireAdmin(request)

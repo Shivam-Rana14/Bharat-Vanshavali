@@ -5,6 +5,8 @@ import User from '@/lib/mongodb/models/User'
 import Payment from '@/lib/mongodb/models/Payment'
 import { getAuthenticatedUser } from '@/lib/api-utils'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     await connectDB()

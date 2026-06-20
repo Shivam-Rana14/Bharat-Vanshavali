@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/mongodb/database'
 import { requireAuth, canAccessUserData } from '@/lib/api-utils'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { userId: string } }

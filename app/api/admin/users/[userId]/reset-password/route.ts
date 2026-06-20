@@ -5,6 +5,8 @@ import { User } from '@/lib/mongodb/models'
 import bcrypt from 'bcryptjs'
 import { databaseService } from '@/lib/mongodb/database'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { userId: string } }
