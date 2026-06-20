@@ -3,6 +3,9 @@ import { requireAuth } from '@/lib/api-utils'
 import { databaseService } from '@/lib/mongodb/database'
 import { User } from '@/lib/mongodb/models'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(request: NextRequest) {
     try {
         const user = requireAuth(request)

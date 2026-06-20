@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/api-utils'
 import { databaseService } from '@/lib/mongodb/database'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function POST(
     request: NextRequest,
     { params }: { params: { familyCode: string } }
