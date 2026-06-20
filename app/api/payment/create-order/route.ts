@@ -133,10 +133,10 @@ export async function POST(request: NextRequest) {
         existingOrder
       }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('[CREATE ORDER] Error:', error)
     return NextResponse.json(
-      { success: false, error: 'Failed to create payment order' },
+      { success: false, error: error.message || 'Failed to create payment order' },
       { status: 500 }
     )
   }
